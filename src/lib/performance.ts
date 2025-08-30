@@ -4,7 +4,7 @@
 export function lazyLoad<T extends React.ComponentType<any>>(
   importFunc: () => Promise<{ default: T }>,
   fallback?: React.ComponentType
-) {
+): React.ComponentType<React.ComponentProps<T>> {
   const LazyComponent = React.lazy(importFunc)
   
   return (props: React.ComponentProps<T>) => (
