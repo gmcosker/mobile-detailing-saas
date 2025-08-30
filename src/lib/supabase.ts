@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Safe Supabase client creation
+// Safe Supabase client creation - completely lazy
 let supabaseClient: ReturnType<typeof createClient<Database>> | null = null
 
 export function getSupabaseClient() {
@@ -18,8 +18,8 @@ export function getSupabaseClient() {
   return supabaseClient
 }
 
-// Export a safe client that returns null if not configured
-export const supabase = getSupabaseClient()
+// Export null by default - client created on-demand only
+export const supabase = null
 
 // Types for our database tables
 export type Database = {
