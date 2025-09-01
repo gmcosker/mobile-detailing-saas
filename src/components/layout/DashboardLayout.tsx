@@ -19,6 +19,27 @@ interface DashboardLayoutProps {
 }
 
 export default function DashboardLayout({ children, title = "Dashboard" }: DashboardLayoutProps) {
+  // Determine which page is active based on the title
+  const getActivePage = () => {
+    switch (title.toLowerCase()) {
+      case 'dashboard':
+      case 'schedule':
+        return '/'
+      case 'customers':
+        return '/customers'
+      case 'photos':
+        return '/photos'
+      case 'payments':
+        return '/payments'
+      case 'sms':
+        return '/sms'
+      default:
+        return '/'
+    }
+  }
+
+  const activePage = getActivePage()
+
   return (
     <div className="min-h-screen bg-background">
       {/* Mobile Header */}
@@ -50,11 +71,11 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
           </h2>
           
           <nav className="space-y-2">
-            <SidebarButton icon={Calendar} label="Schedule" href="/" active />
-            <SidebarButton icon={Users} label="Customers" href="/customers" />
-            <SidebarButton icon={Camera} label="Photos" href="/photos" />
-            <SidebarButton icon={DollarSign} label="Payments" href="/payments" />
-            <SidebarButton icon={MessageSquare} label="SMS" href="/sms" />
+            <SidebarButton icon={Calendar} label="Schedule" href="/" active={activePage === '/'} />
+            <SidebarButton icon={Users} label="Customers" href="/customers" active={activePage === '/customers'} />
+            <SidebarButton icon={Camera} label="Photos" href="/photos" active={activePage === '/photos'} />
+            <SidebarButton icon={DollarSign} label="Payments" href="/payments" active={activePage === '/payments'} />
+            <SidebarButton icon={MessageSquare} label="SMS" href="/sms" active={activePage === '/sms'} />
           </nav>
         </div>
       </aside>
@@ -69,11 +90,11 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
       {/* Mobile Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border md:hidden z-50">
         <div className="grid grid-cols-5 gap-1 p-2">
-          <NavButton icon={Calendar} label="Schedule" href="/" active />
-          <NavButton icon={Users} label="Customers" href="/customers" />
-          <NavButton icon={Camera} label="Photos" href="/photos" />
-          <NavButton icon={DollarSign} label="Payments" href="/payments" />
-          <NavButton icon={MessageSquare} label="SMS" href="/sms" />
+          <NavButton icon={Calendar} label="Schedule" href="/" active={activePage === '/'} />
+          <NavButton icon={Users} label="Customers" href="/customers" active={activePage === '/customers'} />
+          <NavButton icon={Camera} label="Photos" href="/photos" active={activePage === '/photos'} />
+          <NavButton icon={DollarSign} label="Payments" href="/payments" active={activePage === '/payments'} />
+          <NavButton icon={MessageSquare} label="SMS" href="/sms" active={activePage === '/sms'} />
         </div>
       </nav>
     </div>
