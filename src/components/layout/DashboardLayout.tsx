@@ -32,6 +32,7 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
       case 'payments':
         return '/payments'
       case 'sms':
+      case 'sms & reminders':
         return '/sms'
       default:
         return '/'
