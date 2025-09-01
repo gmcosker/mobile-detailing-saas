@@ -115,3 +115,4 @@ INSERT INTO appointments (detailer_id, customer_id, scheduled_date, scheduled_ti
     150.00
 );
 
+

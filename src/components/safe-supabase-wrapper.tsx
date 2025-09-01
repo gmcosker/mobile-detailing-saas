@@ -56,3 +56,4 @@ export function SafeSupabaseWrapper({ children, fallback }: SafeSupabaseWrapperP
 
   return <>{children}</>
 }
+

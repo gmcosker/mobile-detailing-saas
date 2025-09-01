@@ -84,13 +84,17 @@ export default function DashboardHome() {
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-foreground mb-3">Quick Actions</h2>
         <div className="grid grid-cols-2 gap-3">
-          <Button className="h-20 flex-col gap-2">
-            <Plus className="h-6 w-6" />
-            <span>New Appointment</span>
+          <Button asChild className="h-20 flex-col gap-2">
+            <a href="/schedule">
+              <Plus className="h-6 w-6" />
+              <span>New Appointment</span>
+            </a>
           </Button>
-          <Button variant="outline" className="h-20 flex-col gap-2">
-            <Users className="h-6 w-6" />
-            <span>Add Customer</span>
+          <Button asChild variant="outline" className="h-20 flex-col gap-2">
+            <a href="/customers">
+              <Users className="h-6 w-6" />
+              <span>Add Customer</span>
+            </a>
           </Button>
         </div>
       </div>
@@ -99,7 +103,9 @@ export default function DashboardHome() {
       <div className="mb-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold text-foreground">Today's Schedule</h2>
-          <Button variant="ghost" size="sm">View All</Button>
+          <Button asChild variant="ghost" size="sm">
+            <a href="/schedule">View All</a>
+          </Button>
         </div>
         
         <div className="space-y-3">
@@ -232,4 +238,5 @@ function ActivityItem({
     </div>
   )
 }
+
 

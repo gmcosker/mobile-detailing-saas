@@ -42,24 +42,8 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1">
-        {children}
-      </main>
-
-      {/* Mobile Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border md:hidden">
-        <div className="grid grid-cols-5 gap-1 p-2">
-          <NavButton icon={Calendar} label="Schedule" href="/" active />
-          <NavButton icon={Users} label="Customers" href="/customers" />
-          <NavButton icon={Camera} label="Photos" href="/photos" />
-          <NavButton icon={DollarSign} label="Payments" href="/payments" />
-          <NavButton icon={MessageSquare} label="SMS" href="/sms" />
-        </div>
-      </nav>
-
       {/* Desktop Sidebar (hidden on mobile) */}
-      <aside className="hidden md:block fixed left-0 top-0 bottom-0 w-64 bg-card border-r border-border">
+      <aside className="hidden md:block fixed left-0 top-0 bottom-0 w-64 bg-card border-r border-border z-40">
         <div className="p-6">
           <h2 className="text-xl font-bold text-foreground mb-8">
             Mobile Detailing
@@ -75,8 +59,23 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
         </div>
       </aside>
 
-      {/* Desktop Main Content Offset */}
-      <div className="hidden md:block md:ml-64" />
+      {/* Main Content with proper offset */}
+      <main className={`flex-1 ${title === "Dashboard" ? "md:ml-64" : "md:ml-64"}`}>
+        <div className="p-6">
+          {children}
+        </div>
+      </main>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border md:hidden z-50">
+        <div className="grid grid-cols-5 gap-1 p-2">
+          <NavButton icon={Calendar} label="Schedule" href="/" active />
+          <NavButton icon={Users} label="Customers" href="/customers" />
+          <NavButton icon={Camera} label="Photos" href="/photos" />
+          <NavButton icon={DollarSign} label="Payments" href="/payments" />
+          <NavButton icon={MessageSquare} label="SMS" href="/sms" />
+        </div>
+      </nav>
     </div>
   )
 }

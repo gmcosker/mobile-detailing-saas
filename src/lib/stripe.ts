@@ -285,3 +285,4 @@ export const connectService = {
 
 export default stripe
 
+

@@ -14,3 +14,4 @@ export const metadata = {
   description: 'Manage payments, invoices, and earnings for your mobile detailing business',
 }
 
+

@@ -14,3 +14,4 @@ export const metadata = {
   description: 'Manage SMS reminders, notifications, and customer communication for your mobile detailing business',
 }
 
+

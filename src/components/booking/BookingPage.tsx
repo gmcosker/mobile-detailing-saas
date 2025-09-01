@@ -382,3 +382,4 @@ export default function BookingPage({ detailerId }: BookingPageProps) {
   )
 }
 
+
