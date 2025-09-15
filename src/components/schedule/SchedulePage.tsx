@@ -258,3 +258,4 @@ function AppointmentCard({ appointment }: { appointment: any }) {
     </div>
   )
 }
+

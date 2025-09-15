@@ -19,7 +19,7 @@ export const photoStorage = {
 
       // Upload file to Supabase storage
       const { data, error } = await supabase.storage
-        .from('appointment-photos')
+        .from('photos')
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false
@@ -32,7 +32,7 @@ export const photoStorage = {
 
       // Get public URL
       const { data: publicData } = supabase.storage
-        .from('appointment-photos')
+        .from('photos')
         .getPublicUrl(filePath)
 
       return publicData.publicUrl
@@ -52,7 +52,7 @@ export const photoStorage = {
       }
 
       const { error } = await supabase.storage
-        .from('appointment-photos')
+        .from('photos')
         .remove([filePath])
 
       if (error) {
@@ -77,7 +77,7 @@ export const photoStorage = {
       }
 
       const { data, error } = await supabase.storage
-        .from('appointment-photos')
+        .from('photos')
         .createSignedUrl(filePath, expiresIn)
 
       if (error) {

@@ -2,9 +2,27 @@ import Stripe from 'stripe'
 import { loadStripe } from '@stripe/stripe-js'
 
 // Server-side Stripe instance
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_dummy', {
-  apiVersion: '2024-06-20',
-})
+let stripe: Stripe | null = null
+
+function getStripeInstance(): Stripe | null {
+  if (!stripe) {
+    const secretKey = process.env.STRIPE_SECRET_KEY
+    if (!secretKey || secretKey.includes('your_stripe') || secretKey === 'sk_test_dummy') {
+      console.log('⚠️ Stripe not configured - using demo mode')
+      return null
+    }
+    
+    try {
+      stripe = new Stripe(secretKey, {
+        apiVersion: '2024-06-20',
+      })
+    } catch (error) {
+      console.error('❌ Failed to initialize Stripe:', error)
+      return null
+    }
+  }
+  return stripe
+}
 
 // Client-side Stripe instance
 let stripePromise: Promise<Stripe | null>
@@ -24,8 +42,29 @@ export const paymentService = {
     applicationFeeAmount?: number,
     stripeAccountId?: string
   ): Promise<Stripe.PaymentIntent | null> {
+    const stripeInstance = getStripeInstance()
+    
+    if (!stripeInstance) {
+      // Demo mode - return a mock payment intent
+      console.log('🎭 Demo mode: Creating mock payment intent')
+      const paymentIntentId = `pi_demo_${Date.now()}`
+      return {
+        id: paymentIntentId,
+        object: 'payment_intent',
+        amount: Math.round(amount * 100),
+        currency,
+        status: 'requires_payment_method',
+        client_secret: `${paymentIntentId}_secret_demo1234567890abcdef`,
+        created: Math.floor(Date.now() / 1000),
+        metadata: {
+          type: 'mobile_detailing_service',
+          demo: 'true'
+        }
+      } as any
+    }
+
     try {
-      const paymentIntent = await stripe.paymentIntents.create({
+      const paymentIntent = await stripeInstance.paymentIntents.create({
         amount: Math.round(amount * 100), // Convert to cents
         currency,
         application_fee_amount: applicationFeeAmount ? Math.round(applicationFeeAmount * 100) : undefined,
@@ -40,6 +79,37 @@ export const paymentService = {
       return paymentIntent
     } catch (error) {
       console.error('Error creating payment intent:', error)
+      return null
+    }
+  },
+
+  // Get a payment intent by ID
+  async getPaymentIntent(paymentIntentId: string): Promise<Stripe.PaymentIntent | null> {
+    const stripeInstance = getStripeInstance()
+    
+    if (!stripeInstance) {
+      // Demo mode - return a mock payment intent
+      console.log('🎭 Demo mode: Returning mock payment intent')
+      return {
+        id: paymentIntentId,
+        object: 'payment_intent',
+        amount: 2000,
+        currency: 'usd',
+        status: 'succeeded',
+        client_secret: `${paymentIntentId}_secret_demo1234567890abcdef`,
+        created: Math.floor(Date.now() / 1000),
+        metadata: {
+          type: 'mobile_detailing_service',
+          demo: 'true'
+        }
+      } as any
+    }
+
+    try {
+      const paymentIntent = await stripeInstance.paymentIntents.retrieve(paymentIntentId)
+      return paymentIntent
+    } catch (error) {
+      console.error('Error retrieving payment intent:', error)
       return null
     }
   },
@@ -284,5 +354,6 @@ export const connectService = {
 }
 
 export default stripe
+
 
 

@@ -149,7 +149,19 @@ export default function SMSManager({
 
     setSending(true)
     try {
-      const result = await smsService.sendSMS(customerPhone, message)
+      // Send SMS via API
+      const response = await fetch('/api/sms/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phoneNumber: customerPhone,
+          message: message
+        })
+      })
+
+      const result = await response.json()
       setLastResult(result)
       
       if (result.success) {
@@ -157,12 +169,18 @@ export default function SMSManager({
         if (selectedType === 'custom') {
           setCustomMessage('')
         }
+        // Show success message
+        console.log('SMS sent successfully!')
+      } else {
+        console.error(`Failed to send SMS: ${result.error}`)
       }
     } catch (error) {
+      console.error('SMS send error:', error)
       setLastResult({
         success: false,
         error: 'Failed to send message'
       })
+      alert('Failed to send SMS. Please try again.')
     } finally {
       setSending(false)
     }
@@ -341,5 +359,6 @@ export default function SMSManager({
     </div>
   )
 }
+
 
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { photoService } from '@/lib/database'
+import { getSupabaseClient } from '@/lib/supabase'
 import type { Database } from '@/lib/supabase'
 import { 
   Camera, 
@@ -22,6 +23,7 @@ interface PhotoGalleryProps {
   showUploadButton?: boolean
   maxPhotos?: number
   onPhotoDelete?: (photoId: string) => void
+  refreshTrigger?: number // Add this to trigger refresh when photos are uploaded
 }
 
 export default function PhotoGallery({ 
@@ -29,29 +31,81 @@ export default function PhotoGallery({
   detailerId, 
   showUploadButton = false,
   maxPhotos,
-  onPhotoDelete 
+  onPhotoDelete,
+  refreshTrigger
 }: PhotoGalleryProps) {
   const [photos, setPhotos] = useState<Photo[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null)
   const [showModal, setShowModal] = useState(false)
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({})
 
   useEffect(() => {
     loadPhotos()
+  }, [appointmentId, refreshTrigger])
+
+  // Also reload photos when component mounts (navigation back)
+  useEffect(() => {
+    if (appointmentId && photos.length === 0) {
+      console.log('Reloading photos on component mount for appointment:', appointmentId)
+      loadPhotos()
+    }
   }, [appointmentId])
 
   const loadPhotos = async () => {
-    if (!appointmentId) return
+    if (!appointmentId) {
+      console.log('No appointmentId provided to PhotoGallery')
+      return
+    }
     
+    console.log('Loading photos for appointment:', appointmentId)
     setLoading(true)
     try {
       const fetchedPhotos = await photoService.getByAppointment(appointmentId)
+      console.log('Fetched photos:', fetchedPhotos)
       setPhotos(fetchedPhotos)
+      
+      // Generate signed URLs for each photo
+      await generatePhotoUrls(fetchedPhotos)
     } catch (error) {
       console.error('Error loading photos:', error)
     } finally {
       setLoading(false)
     }
+  }
+
+  const generatePhotoUrls = async (photos: Photo[]) => {
+    const supabase = getSupabaseClient()
+    if (!supabase) {
+      console.warn('No Supabase client available for URL generation')
+      return
+    }
+
+    const urlMap: Record<string, string> = {}
+    
+    for (const photo of photos) {
+      try {
+        if (photo.file_path.startsWith('http')) {
+          // Use the stored URL directly (now that bucket is public)
+          urlMap[photo.id] = photo.file_path
+          console.log('Using stored URL for photo:', photo.id)
+        } else {
+          // Generate public URL for relative path
+          const { data } = supabase.storage
+            .from('photos')
+            .getPublicUrl(photo.file_path)
+          
+          urlMap[photo.id] = data.publicUrl
+          console.log('Generated public URL for photo:', photo.id)
+        }
+      } catch (error) {
+        console.error('Error processing photo URL:', photo.id, error)
+        urlMap[photo.id] = photo.file_path // Fallback
+      }
+    }
+    
+    setPhotoUrls(urlMap)
+    console.log('Generated photo URLs:', Object.keys(urlMap).length, 'URLs cached')
   }
 
   const handleDeletePhoto = async (photo: Photo) => {
@@ -71,7 +125,7 @@ export default function PhotoGallery({
 
   const handleDownloadPhoto = (photo: Photo) => {
     const link = document.createElement('a')
-    link.href = photo.file_path
+    link.href = getPhotoUrl(photo)
     link.download = photo.file_name
     link.target = '_blank'
     document.body.appendChild(link)
@@ -99,6 +153,18 @@ export default function PhotoGallery({
     const sizes = ['Bytes', 'KB', 'MB', 'GB']
     const i = Math.floor(Math.log(bytes) / Math.log(k))
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+  const getPhotoUrl = (photo: Photo): string => {
+    // Use cached URL if available
+    if (photoUrls[photo.id]) {
+      console.log('Using cached URL for photo:', photo.id, 'URL:', photoUrls[photo.id].substring(0, 50) + '...')
+      return photoUrls[photo.id]
+    }
+    
+    // Fallback to file_path if no cached URL
+    console.warn('No cached URL for photo:', photo.id, 'using file_path:', photo.file_path)
+    return photo.file_path
   }
 
   if (loading) {
@@ -143,9 +209,16 @@ export default function PhotoGallery({
                 {getPhotosByType('before').slice(0, 2).map((photo) => (
                   <div key={photo.id} className="relative group cursor-pointer" onClick={() => openModal(photo)}>
                     <img
-                      src={photo.file_path}
+                      src={getPhotoUrl(photo)}
                       alt="Before photo"
                       className="w-full h-32 object-cover rounded-lg"
+                      onLoad={() => console.log('Before photo loaded successfully:', photo.id)}
+                      onError={(e) => {
+                        console.error('Before photo failed to load:', photo.id, 'URL:', getPhotoUrl(photo))
+                        // Try to regenerate the URL
+                        generatePhotoUrls([photo])
+                        e.currentTarget.style.display = 'none'
+                      }}
                     />
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                       <ZoomIn className="h-6 w-6 text-white" />
@@ -161,9 +234,14 @@ export default function PhotoGallery({
                 {getPhotosByType('after').slice(0, 2).map((photo) => (
                   <div key={photo.id} className="relative group cursor-pointer" onClick={() => openModal(photo)}>
                     <img
-                      src={photo.file_path}
+                      src={getPhotoUrl(photo)}
                       alt="After photo"
                       className="w-full h-32 object-cover rounded-lg"
+                      onLoad={() => console.log('After photo loaded successfully:', photo.id)}
+                      onError={(e) => {
+                        console.error('After photo failed to load:', photo.id, 'URL:', getPhotoUrl(photo))
+                        e.currentTarget.style.display = 'none'
+                      }}
                     />
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                       <ZoomIn className="h-6 w-6 text-white" />
@@ -195,9 +273,14 @@ export default function PhotoGallery({
             <div key={photo.id} className="relative group">
               <div className="relative cursor-pointer" onClick={() => openModal(photo)}>
                 <img
-                  src={photo.file_path}
+                  src={getPhotoUrl(photo)}
                   alt={`${photo.photo_type} photo`}
                   className="w-full h-32 object-cover rounded-lg"
+                  onLoad={() => console.log('Photo loaded successfully:', photo.id, photo.photo_type)}
+                  onError={(e) => {
+                    console.error('Photo failed to load:', photo.id, photo.photo_type, 'URL:', getPhotoUrl(photo))
+                    e.currentTarget.style.display = 'none'
+                  }}
                 />
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                   <ZoomIn className="h-6 w-6 text-white" />
@@ -263,7 +346,7 @@ export default function PhotoGallery({
             
             <div className="p-4">
               <img
-                src={selectedPhoto.file_path}
+                src={getPhotoUrl(selectedPhoto)}
                 alt={`${selectedPhoto.photo_type} photo`}
                 className="w-full max-h-[70vh] object-contain rounded-lg"
               />
@@ -274,5 +357,6 @@ export default function PhotoGallery({
     </div>
   )
 }
+
 
 

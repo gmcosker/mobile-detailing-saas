@@ -10,7 +10,8 @@ import {
   MessageSquare,
   Menu,
   Bell,
-  Settings
+  Settings,
+  Tag
 } from 'lucide-react'
 
 interface DashboardLayoutProps {
@@ -27,6 +28,8 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
         return '/'
       case 'customers':
         return '/customers'
+      case 'services':
+        return '/services'
       case 'photos':
         return '/photos'
       case 'payments':
@@ -34,6 +37,9 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
       case 'sms':
       case 'sms & reminders':
         return '/sms'
+      case 'brand settings':
+      case 'branding':
+        return '/branding'
       default:
         return '/'
     }
@@ -57,8 +63,10 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
             <Button variant="ghost" size="icon">
               <Bell className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon">
-              <Settings className="h-5 w-5" />
+            <Button variant="ghost" size="icon" asChild>
+              <a href="/branding">
+                <Settings className="h-5 w-5" />
+              </a>
             </Button>
           </div>
         </div>
@@ -74,9 +82,11 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
           <nav className="space-y-2">
             <SidebarButton icon={Calendar} label="Schedule" href="/" active={activePage === '/'} />
             <SidebarButton icon={Users} label="Customers" href="/customers" active={activePage === '/customers'} />
+            <SidebarButton icon={Tag} label="Services" href="/services" active={activePage === '/services'} />
             <SidebarButton icon={Camera} label="Photos" href="/photos" active={activePage === '/photos'} />
             <SidebarButton icon={DollarSign} label="Payments" href="/payments" active={activePage === '/payments'} />
             <SidebarButton icon={MessageSquare} label="SMS" href="/sms" active={activePage === '/sms'} />
+            <SidebarButton icon={Settings} label="Brand Settings" href="/branding" active={activePage === '/branding'} />
           </nav>
         </div>
       </aside>

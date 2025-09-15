@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import InvoiceGenerator from './InvoiceGenerator'
+import PaymentProcessor from './PaymentProcessor'
 import { paymentService } from '@/lib/stripe'
 import { 
   DollarSign, 
@@ -240,6 +241,34 @@ export default function PaymentsPage() {
         </div>
       </div>
 
+      {/* Payment Processor Demo */}
+      <div className="bg-card border border-border rounded-lg">
+        <div className="p-6 border-b border-border">
+          <h3 className="text-lg font-semibold text-foreground">Process Payment</h3>
+          <p className="text-sm text-muted-foreground">
+            Demo payment processing for completed services
+          </p>
+        </div>
+        <div className="p-6">
+          <PaymentProcessor
+            appointmentId="demo-appointment-123"
+            customerName="Jane Smith"
+            customerEmail="jane@example.com"
+            customerPhone="+1234567890"
+            serviceType="Full Detail"
+            amount={150.00}
+            onPaymentSuccess={(paymentId) => {
+              console.log('Payment successful:', paymentId)
+              // Refresh payments list or show success message
+            }}
+            onPaymentError={(error) => {
+              console.error('Payment failed:', error)
+              // Show error message
+            }}
+          />
+        </div>
+      </div>
+
       {/* Quick Actions */}
       <div className="bg-card border border-border rounded-lg">
         <div className="p-6 border-b border-border">
@@ -348,5 +377,6 @@ export default function PaymentsPage() {
     </div>
   )
 }
+
 
 

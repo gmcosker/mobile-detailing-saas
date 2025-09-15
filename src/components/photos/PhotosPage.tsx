@@ -79,13 +79,42 @@ export default function PhotosPage() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   useEffect(() => {
-    // In a real app, fetch appointments from database
-    // For now, use mock data
-    setAppointments(mockAppointments)
-    setLoading(false)
+    // Fetch appointments from database
+    const fetchAppointments = async () => {
+      try {
+        // For now, we'll use a hardcoded detailer ID since we don't have auth yet
+        const detailerId = '7eb3efd9-9676-41d8-bb93-57c484beeccb' // From our sample data
+        console.log('Fetching appointments for detailer:', detailerId)
+        const appointments = await appointmentService.getByDetailer(detailerId)
+        console.log('Fetched appointments:', appointments)
+        setAppointments(appointments)
+      } catch (error) {
+        console.error('Error fetching appointments:', error)
+        // Fallback to mock data if database fails
+        setAppointments(mockAppointments)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchAppointments()
   }, [])
+
+  // Force refresh photos when navigating back to this page
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && selectedAppointment) {
+        console.log('Page became visible, refreshing photos...')
+        setRefreshTrigger(prev => prev + 1)
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [selectedAppointment])
 
   const handleBackToList = () => {
     setSelectedAppointment(null)
@@ -163,8 +192,8 @@ export default function PhotosPage() {
             appointmentId={selectedAppointment.id}
             photoType="before"
             onUploadComplete={() => {
-              // Refresh gallery or handle success
               console.log('Before photo uploaded')
+              setRefreshTrigger(prev => prev + 1) // Trigger gallery refresh
             }}
           />
           
@@ -173,6 +202,7 @@ export default function PhotosPage() {
             photoType="during"
             onUploadComplete={() => {
               console.log('Progress photo uploaded')
+              setRefreshTrigger(prev => prev + 1) // Trigger gallery refresh
             }}
           />
           
@@ -181,6 +211,7 @@ export default function PhotosPage() {
             photoType="after"
             onUploadComplete={() => {
               console.log('After photo uploaded')
+              setRefreshTrigger(prev => prev + 1) // Trigger gallery refresh
             }}
           />
         </div>
@@ -188,10 +219,20 @@ export default function PhotosPage() {
         {/* Photo Gallery */}
         <PhotoGallery
           appointmentId={selectedAppointment.id}
+          refreshTrigger={refreshTrigger}
           onPhotoDelete={(photoId) => {
             console.log('Photo deleted:', photoId)
+            setRefreshTrigger(prev => prev + 1) // Trigger gallery refresh
           }}
         />
+        
+        {/* Debug info */}
+        <div className="mt-4 p-4 bg-muted rounded-lg text-sm">
+          <p><strong>Debug Info:</strong></p>
+          <p>Appointment ID: {selectedAppointment.id}</p>
+          <p>Customer: {selectedAppointment.customers?.name}</p>
+          <p>Refresh Trigger: {refreshTrigger}</p>
+        </div>
       </div>
     )
   }
@@ -310,5 +351,6 @@ export default function PhotosPage() {
     </div>
   )
 }
+
 
 
