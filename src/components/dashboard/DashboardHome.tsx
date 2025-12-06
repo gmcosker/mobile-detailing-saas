@@ -14,7 +14,6 @@ import {
   Car,
   Loader2
 } from 'lucide-react'
-import { appointmentService, customerService } from '@/lib/database'
 
 // Real data types
 interface DashboardStats {
@@ -41,17 +40,53 @@ export default function DashboardHome() {
   })
   const [upcomingAppointments, setUpcomingAppointments] = useState<UpcomingAppointment[]>([])
   const [loading, setLoading] = useState(true)
+  const [bookingUrl, setBookingUrl] = useState<string>('')
+  const [detailerId, setDetailerId] = useState<string>('')
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true)
         
-        // For now, use the hardcoded detailer ID from our sample data
-        const detailerId = '7eb3efd9-9676-41d8-bb93-57c484beeccb'
+        // Get auth token
+        const token = localStorage.getItem('auth_token')
+        if (!token) {
+          console.error('No auth token found')
+          setLoading(false)
+          return
+        }
+
+        // Get user info to find detailer_id
+        const userResponse = await fetch('/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        const userData = await userResponse.json()
+        if (userData.success && userData.user?.detailer_id) {
+          const userDetailerId = userData.user.detailer_id
+          setDetailerId(userDetailerId)
+          // Set booking URL
+          const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3002'
+          setBookingUrl(`${baseUrl}/book/${userDetailerId}`)
+        }
         
         // Fetch appointments
-        const appointments = await appointmentService.getByDetailer(detailerId, 50)
+        const appointmentsResponse = await fetch('/api/appointments', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+        
+        const appointmentsData = await appointmentsResponse.json()
+        if (!appointmentsData.success) {
+          throw new Error(appointmentsData.error || 'Failed to fetch appointments')
+        }
+        
+        const appointments = appointmentsData.appointments || []
         
         // Calculate today's appointments
         const today = new Date().toISOString().split('T')[0]
@@ -79,12 +114,19 @@ export default function DashboardHome() {
           .filter(apt => apt.status === 'confirmed' || apt.status === 'pending')
           .map(apt => ({
             id: apt.id,
-            time: apt.scheduled_time,
+            time: formatTime(apt.scheduled_time),
             customer: (apt as any).customers?.name || 'Unknown Customer',
             service: apt.service_type,
             status: apt.status
           }))
-          .sort((a, b) => a.time.localeCompare(b.time))
+          .sort((a, b) => {
+            // Sort by time (convert to comparable format)
+            const timeA = a.time.includes('AM') ? a.time.replace(' AM', '').replace(':', '') : 
+                         a.time.includes('PM') ? (parseInt(a.time.replace(' PM', '').replace(':', '')) + 1200).toString() : a.time
+            const timeB = b.time.includes('AM') ? b.time.replace(' AM', '').replace(':', '') : 
+                         b.time.includes('PM') ? (parseInt(b.time.replace(' PM', '').replace(':', '')) + 1200).toString() : b.time
+            return timeA.localeCompare(timeB)
+          })
 
         setStats({
           todayAppointments: todayAppointments.length,
@@ -97,36 +139,14 @@ export default function DashboardHome() {
         
       } catch (error) {
         console.error('Error fetching dashboard data:', error)
-        // Fallback to mock data on error
+        // Set empty stats on error
         setStats({
-          todayAppointments: 3,
-          weekRevenue: 1250,
-          totalCustomers: 47,
-          pendingAppointments: 5
+          todayAppointments: 0,
+          weekRevenue: 0,
+          totalCustomers: 0,
+          pendingAppointments: 0
         })
-        setUpcomingAppointments([
-          {
-            id: '1',
-            time: '10:00 AM',
-            customer: 'Jane Smith',
-            service: 'Full Detail',
-            status: 'confirmed'
-          },
-          {
-            id: '2',
-            time: '2:00 PM',
-            customer: 'Mike Johnson',
-            service: 'Wash & Wax',
-            status: 'pending'
-          },
-          {
-            id: '3',
-            time: '4:00 PM',
-            customer: 'Sarah Davis',
-            service: 'Interior Detail',
-            status: 'confirmed'
-          }
-        ])
+        setUpcomingAppointments([])
       } finally {
         setLoading(false)
       }
@@ -139,6 +159,22 @@ export default function DashboardHome() {
     
     return () => clearInterval(interval)
   }, [])
+
+  const formatTime = (time: string): string => {
+    // Convert HH:MM:SS to 12-hour format
+    const [hours, minutes] = time.split(':')
+    const hour = parseInt(hours, 10)
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    const hour12 = hour % 12 || 12
+    return `${hour12}:${minutes} ${ampm}`
+  }
+
+  const copyBookingUrl = () => {
+    if (bookingUrl) {
+      navigator.clipboard.writeText(bookingUrl)
+      alert('Booking URL copied to clipboard!')
+    }
+  }
 
   if (loading) {
     return (
@@ -196,6 +232,38 @@ export default function DashboardHome() {
             color="orange"
           />
         </div>
+
+        {/* Booking URL Card */}
+        {bookingUrl && (
+          <div className="bg-gradient-to-r from-purple-50 to-pink-50 backdrop-blur-sm rounded-3xl shadow-xl border border-purple-200/50 p-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Your Booking Page</h2>
+            <p className="text-gray-600 mb-4">Share this link with customers to let them book appointments online:</p>
+            <div className="flex items-center gap-4 bg-white rounded-xl p-4 border border-purple-200/50">
+              <input
+                type="text"
+                value={bookingUrl}
+                readOnly
+                className="flex-1 bg-transparent text-gray-900 font-mono text-sm focus:outline-none"
+              />
+              <Button
+                onClick={copyBookingUrl}
+                className="bg-gradient-to-r from-purple-500 to-pink-600 text-white hover:shadow-lg transition-all"
+              >
+                Copy Link
+              </Button>
+            </div>
+            <div className="mt-4">
+              <a
+                href={bookingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-purple-600 hover:text-purple-700 font-semibold underline"
+              >
+                Preview booking page →
+              </a>
+            </div>
+          </div>
+        )}
 
         {/* Quick Actions */}
         <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-8">

@@ -90,6 +90,118 @@ export const customerService = {
     }
     
     return data
+  },
+
+  async getById(customerId: string): Promise<Customer | null> {
+    const supabase = getSupabaseClient()
+    if (!supabase) return null
+    
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('id', customerId)
+      .single()
+    
+    if (error) {
+      console.error('Error fetching customer:', error)
+      return null
+    }
+    
+    return data
+  },
+
+  async update(customerId: string, updates: Partial<Tables['customers']['Update']>): Promise<Customer | null> {
+    const supabase = getSupabaseClient()
+    if (!supabase) return null
+    
+    const { data, error } = await supabase
+      .from('customers')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', customerId)
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('Error updating customer:', error)
+      return null
+    }
+    
+    return data
+  },
+
+  async getByDetailer(detailerId: string, search?: string, limit: number = 50): Promise<Customer[]> {
+    const supabase = getSupabaseClient()
+    if (!supabase) return []
+    
+    // Resolve detailer UUID
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(detailerId)
+    let detailerUuid = detailerId
+    
+    if (!isUuid) {
+      const { data: detailer } = await supabase
+        .from('detailers')
+        .select('id')
+        .eq('detailer_id', detailerId)
+        .single()
+      
+      if (!detailer) return []
+      detailerUuid = detailer.id
+    }
+    
+    // Get customers via appointments
+    let query = supabase
+      .from('appointments')
+      .select('customers(*)')
+      .eq('detailer_id', detailerUuid)
+      .limit(limit * 2) // Get more to account for duplicates
+    
+    const { data, error } = await query
+    
+    if (error) {
+      console.error('Error fetching customers:', error)
+      return []
+    }
+    
+    // Extract unique customers
+    const customerMap = new Map<string, Customer>()
+    data?.forEach((apt: any) => {
+      if (apt.customers) {
+        customerMap.set(apt.customers.id, apt.customers)
+      }
+    })
+    
+    let customers = Array.from(customerMap.values())
+    
+    // Apply search filter if provided
+    if (search) {
+      const searchLower = search.toLowerCase()
+      customers = customers.filter(c => 
+        c.name.toLowerCase().includes(searchLower) ||
+        c.email?.toLowerCase().includes(searchLower) ||
+        c.phone.includes(search)
+      )
+    }
+    
+    // Limit results
+    return customers.slice(0, limit)
+  },
+
+  async getAll(limit: number = 100): Promise<Customer[]> {
+    const supabase = getSupabaseClient()
+    if (!supabase) return []
+    
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    
+    if (error) {
+      console.error('Error fetching all customers:', error)
+      return []
+    }
+    
+    return data || []
   }
 }
 
@@ -185,13 +297,34 @@ export const appointmentService = {
     const supabase = getSupabaseClient()
     if (!supabase) return []
     
+    // Resolve detailer_id string to UUID if needed
+    let detailerUuid = detailerId
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(detailerId)
+    
+    if (!isUuid) {
+      // detailerId is a string identifier, need to look up the UUID
+      const { data: detailer, error: detailerError } = await supabase
+        .from('detailers')
+        .select('id')
+        .eq('detailer_id', detailerId)
+        .single()
+      
+      if (detailerError || !detailer) {
+        console.error('Error finding detailer for booked slots:', detailerError)
+        return []
+      }
+      
+      detailerUuid = detailer.id
+    }
+    
+    // Get all appointments (including pending) for this detailer in the date range
     const { data, error } = await supabase
       .from('appointments')
       .select('scheduled_date, scheduled_time')
-      .eq('detailer_id', detailerId)
+      .eq('detailer_id', detailerUuid)
       .gte('scheduled_date', startDate)
       .lte('scheduled_date', endDate)
-      .in('status', ['pending', 'confirmed', 'in_progress'])
+      .in('status', ['pending', 'confirmed', 'in_progress']) // Include pending to prevent double-booking
     
     if (error) {
       console.error('Error fetching booked slots:', error)
@@ -202,6 +335,76 @@ export const appointmentService = {
       date: apt.scheduled_date,
       time: apt.scheduled_time
     })) || []
+  },
+
+  async getById(appointmentId: string): Promise<Appointment | null> {
+    const supabase = getSupabaseClient()
+    if (!supabase) return null
+    
+    const { data, error } = await supabase
+      .from('appointments')
+      .select(`
+        *,
+        customers (*),
+        detailers (*)
+      `)
+      .eq('id', appointmentId)
+      .single()
+    
+    if (error) {
+      console.error('Error fetching appointment:', error)
+      return null
+    }
+    
+    return data
+  },
+
+  async update(appointmentId: string, updates: Partial<Tables['appointments']['Update']>): Promise<Appointment | null> {
+    const supabase = getSupabaseClient()
+    if (!supabase) return null
+    
+    const { data, error } = await supabase
+      .from('appointments')
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq('id', appointmentId)
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('Error updating appointment:', error)
+      return null
+    }
+    
+    return data
+  },
+
+  async delete(appointmentId: string): Promise<boolean> {
+    const supabase = getSupabaseClient()
+    if (!supabase) {
+      console.error('Supabase client not available for delete')
+      return false
+    }
+    
+    try {
+      const { data, error } = await supabase
+        .from('appointments')
+        .delete()
+        .eq('id', appointmentId)
+        .select()
+      
+      if (error) {
+        console.error('Error deleting appointment:', error)
+        console.error('Error details:', JSON.stringify(error, null, 2))
+        return false
+      }
+      
+      console.log('Appointment deleted successfully:', appointmentId)
+      return true
+    } catch (err: any) {
+      console.error('Exception deleting appointment:', err)
+      console.error('Exception details:', JSON.stringify(err, null, 2))
+      return false
+    }
   }
 }
 

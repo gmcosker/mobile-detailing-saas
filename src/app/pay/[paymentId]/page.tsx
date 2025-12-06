@@ -16,3 +16,5 @@ export default function PaymentPage({ params }: PaymentPageProps) {
 
   return <CustomerPaymentPage paymentId={paymentId} />
 }
+
+

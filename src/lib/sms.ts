@@ -44,7 +44,13 @@ export const smsTemplates = {
     `Hi ${customerName}! This is a friendly reminder about your $${amount} invoice from ${businessName}. Pay securely here: ${paymentLink}`,
   
   weatherAlert: (customerName: string, date: string, businessName: string) =>
-    `Hi ${customerName}! Due to weather conditions, we may need to reschedule your appointment on ${date}. ${businessName} will contact you soon to confirm or reschedule.`
+    `Hi ${customerName}! Due to weather conditions, we may need to reschedule your appointment on ${date}. ${businessName} will contact you soon to confirm or reschedule.`,
+  
+  appointmentReschedule: (customerName: string, serviceType: string, oldDate: string, oldTime: string, businessName: string, reason: string) =>
+    `Hi ${customerName}! Your ${serviceType} appointment with ${businessName} scheduled for ${oldDate} at ${oldTime} needs to be rescheduled. ${reason} Please contact us to choose a new date and time.`,
+  
+  appointmentCancellation: (customerName: string, serviceType: string, date: string, time: string, businessName: string, reason: string) =>
+    `Hi ${customerName}! Your ${serviceType} appointment with ${businessName} on ${date} at ${time} has been cancelled. ${reason} We apologize for any inconvenience. Please contact us if you'd like to reschedule.`
 }
 
 // SMS Service functions
@@ -184,6 +190,48 @@ export const smsService = {
     businessName: string
   ) {
     const message = smsTemplates.paymentReminder(customerName, amount, paymentLink, businessName)
+    return await this.sendSMS(customerPhone, message)
+  },
+
+  // Send appointment reschedule notification
+  async sendAppointmentReschedule(
+    customerPhone: string,
+    customerName: string,
+    serviceType: string,
+    oldDate: string,
+    oldTime: string,
+    businessName: string,
+    reason: string
+  ) {
+    const message = smsTemplates.appointmentReschedule(
+      customerName,
+      serviceType,
+      oldDate,
+      oldTime,
+      businessName,
+      reason
+    )
+    return await this.sendSMS(customerPhone, message)
+  },
+
+  // Send appointment cancellation notification
+  async sendAppointmentCancellation(
+    customerPhone: string,
+    customerName: string,
+    serviceType: string,
+    date: string,
+    time: string,
+    businessName: string,
+    reason: string
+  ) {
+    const message = smsTemplates.appointmentCancellation(
+      customerName,
+      serviceType,
+      date,
+      time,
+      businessName,
+      reason
+    )
     return await this.sendSMS(customerPhone, message)
   },
 

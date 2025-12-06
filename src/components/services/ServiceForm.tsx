@@ -25,7 +25,7 @@ interface Service {
 
 interface ServiceFormProps {
   service?: Service | null
-  onSave: (service: Service) => void
+  onSave: (service: Omit<Service, 'id'>) => Promise<void>
   onCancel: () => void
   isOpen: boolean
 }

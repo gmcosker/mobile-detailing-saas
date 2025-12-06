@@ -14,7 +14,7 @@ import {
   Car,
   Loader2
 } from 'lucide-react'
-import { detailerService, appointmentService, customerService, brandingService } from '@/lib/database'
+// Removed direct database service imports - using API endpoints instead
 
 interface BookingPageProps {
   detailerId: string
@@ -35,7 +35,7 @@ const timeSlots = [
 
 const nextSevenDays = Array.from({ length: 7 }, (_, i) => {
   const date = new Date()
-  date.setDate(date.getDate() + i + 1) // Start from tomorrow
+  date.setDate(date.getDate() + i) // Start from today
   return date
 })
 
@@ -72,30 +72,71 @@ export default function BookingPage({ detailerId }: BookingPageProps) {
     } as React.CSSProperties
   }
 
-  // Load detailer data, branding, and booked slots
+  // Load detailer data, branding, services, and booked slots
   useEffect(() => {
     const loadData = async () => {
       setLoading(true)
       try {
-        // Load detailer info
-        const detailerData = await detailerService.getByDetailerId(detailerId)
-        if (detailerData) {
-          setDetailer(detailerData)
+        // Calculate date range for booked slots using local timezone
+        const formatDateLocal = (date: Date): string => {
+          const year = date.getFullYear()
+          const month = String(date.getMonth() + 1).padStart(2, '0')
+          const day = String(date.getDate()).padStart(2, '0')
+          return `${year}-${month}-${day}`
         }
+        const startDate = formatDateLocal(nextSevenDays[0])
+        const endDate = formatDateLocal(nextSevenDays[6])
 
-        // Load branding info
-        const brandingData = await brandingService.getByDetailerId(detailerId)
-        if (brandingData) {
-          setBranding(brandingData)
+        // Load all booking data from API
+        const response = await fetch(`/api/booking/${detailerId}/info?startDate=${startDate}&endDate=${endDate}`)
+        const data = await response.json()
+
+        if (response.ok && data.success) {
+          if (data.detailer) {
+            setDetailer(data.detailer)
+          }
+
+          if (data.branding) {
+            setBranding(data.branding)
+          }
+
+          // Always use services from the database (even if empty array)
+          // Only use defaults if the API call completely fails
+          if (data.services !== undefined) {
+            if (data.services.length > 0) {
+              // Transform database services to match booking page format
+              const transformedServices = data.services.map((service: any) => ({
+                id: service.id,
+                name: service.name,
+                price: parseFloat(service.price) || 0,
+                duration: service.duration || 30,
+                description: service.description || null,
+                category: service.category || 'General'
+              }))
+              setServices(transformedServices)
+              console.log('Loaded services from database:', transformedServices)
+            } else {
+              // Detailer has no services - show empty state
+              setServices([])
+              console.log('Detailer has no services configured')
+            }
+          } else {
+            // Services field not in response - keep defaults as fallback
+            console.warn('Services field missing from API response, using defaults')
+          }
+
+          if (data.bookedSlots) {
+            setBookedSlots(data.bookedSlots)
+          }
+        } else {
+          console.error('Error loading booking data:', data.error)
+          // Only use defaults if API call completely fails
+          console.warn('API call failed, using default services as fallback')
         }
-
-        // Load booked slots for the next 7 days
-        const startDate = nextSevenDays[0].toISOString().split('T')[0]
-        const endDate = nextSevenDays[6].toISOString().split('T')[0]
-        const booked = await appointmentService.getBookedSlots(detailerId, startDate, endDate)
-        setBookedSlots(booked)
       } catch (error) {
         console.error('Error loading booking data:', error)
+        // Continue with defaults - API will validate on submit
+        console.warn('Continuing with default services due to error')
       } finally {
         setLoading(false)
       }
@@ -104,9 +145,32 @@ export default function BookingPage({ detailerId }: BookingPageProps) {
     loadData()
   }, [detailerId])
 
+  // Refresh booked slots
+  const refreshBookedSlots = async () => {
+    try {
+      const formatDateLocal = (date: Date): string => {
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        return `${year}-${month}-${day}`
+      }
+      const startDate = formatDateLocal(nextSevenDays[0])
+      const endDate = formatDateLocal(nextSevenDays[6])
+      const response = await fetch(`/api/booking/${detailerId}/info?startDate=${startDate}&endDate=${endDate}`)
+      const data = await response.json()
+      if (response.ok && data.success && data.bookedSlots) {
+        setBookedSlots(data.bookedSlots)
+        console.log('Refreshed booked slots:', data.bookedSlots)
+      }
+    } catch (error) {
+      console.error('Error refreshing booked slots:', error)
+    }
+  }
+
   // Check if a time slot is available
   const isSlotAvailable = (date: Date, time: string): boolean => {
     const dateStr = date.toISOString().split('T')[0]
+    // Convert time to database format (HH:MM:SS or HH:MM)
     const timeStr = time === '8:00 AM' ? '08:00:00' :
                    time === '9:00 AM' ? '09:00:00' :
                    time === '10:00 AM' ? '10:00:00' :
@@ -117,9 +181,16 @@ export default function BookingPage({ detailerId }: BookingPageProps) {
                    time === '4:00 PM' ? '16:00:00' :
                    time === '5:00 PM' ? '17:00:00' : time
 
-    return !bookedSlots.some(slot => 
-      slot.date === dateStr && slot.time === timeStr
-    )
+    // Check if this slot is booked (match by date and time - compare first 5 chars HH:MM)
+    const isBooked = bookedSlots.some(slot => {
+      if (slot.date !== dateStr) return false
+      // Compare time slots (handle both HH:MM:SS and HH:MM formats)
+      const slotTime = slot.time.substring(0, 5) // Get HH:MM
+      const checkTime = timeStr.substring(0, 5) // Get HH:MM
+      return slotTime === checkTime
+    })
+
+    return !isBooked
   }
 
   const handleServiceSelect = (service: any) => {
@@ -134,11 +205,48 @@ export default function BookingPage({ detailerId }: BookingPageProps) {
   }
 
   const handleBookingSubmit = async () => {
-    if (!selectedDate || !selectedTime || !selectedService || !detailer) return
+    console.log('handleBookingSubmit called', {
+      detailerId,
+      selectedDate,
+      selectedTime,
+      selectedService,
+      detailer,
+      customerInfo
+    })
+    
+    // Validation - check all required fields
+    if (!selectedDate) {
+      alert('Please select a date')
+      return
+    }
+    
+    if (!selectedTime) {
+      alert('Please select a time')
+      return
+    }
+    
+    if (!selectedService) {
+      alert('Please select a service')
+      return
+    }
+    
+    // Note: We allow booking even if detailer data isn't loaded
+    // The API will validate the detailer exists when the booking is submitted
+    // This allows the page to work even if the initial data load fails
+    if (!detailer) {
+      console.warn('Detailer data not loaded, but proceeding with booking. API will validate.')
+      // Don't block the booking - let the API handle validation
+    }
+    
+    if (!customerInfo.name || !customerInfo.phone || !customerInfo.address) {
+      alert('Please fill in all required fields: Name, Phone, and Address')
+      return
+    }
     
     setSubmitting(true)
     try {
-      // Convert time to database format
+      console.log('Submitting booking...')
+      // Convert time to database format (HH:MM:SS)
       const timeStr = selectedTime === '8:00 AM' ? '08:00:00' :
                      selectedTime === '9:00 AM' ? '09:00:00' :
                      selectedTime === '10:00 AM' ? '10:00:00' :
@@ -149,46 +257,54 @@ export default function BookingPage({ detailerId }: BookingPageProps) {
                      selectedTime === '4:00 PM' ? '16:00:00' :
                      selectedTime === '5:00 PM' ? '17:00:00' : selectedTime
 
-      // Check if customer already exists
-      let customer = await customerService.findByPhoneOrEmail(customerInfo.phone, customerInfo.email)
-      
-      if (!customer) {
-        // Create new customer
-        customer = await customerService.create({
-          name: customerInfo.name,
-          email: customerInfo.email || null,
-          phone: customerInfo.phone,
-          address: customerInfo.address,
-          notes: customerInfo.notes
+      // Format date as YYYY-MM-DD using local timezone (not UTC)
+      const year = selectedDate.getFullYear()
+      const month = String(selectedDate.getMonth() + 1).padStart(2, '0')
+      const day = String(selectedDate.getDate()).padStart(2, '0')
+      const dateStr = `${year}-${month}-${day}`
+
+      // Call the booking API endpoint
+      const response = await fetch(`/api/booking/${detailerId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          serviceId: selectedService.id,
+          serviceName: selectedService.name, // Include service name for default services
+          servicePrice: selectedService.price, // Include service price for default services
+          scheduled_date: dateStr,
+          scheduled_time: timeStr,
+          customer: {
+            name: customerInfo.name,
+            phone: customerInfo.phone,
+            email: customerInfo.email || undefined,
+            address: customerInfo.address || undefined,
+            notes: customerInfo.notes || undefined
+          }
         })
-      }
-
-      if (!customer) {
-        throw new Error('Failed to create or find customer')
-      }
-
-      // Create appointment
-      const appointment = await appointmentService.create({
-        detailer_id: detailer.id,
-        customer_id: customer.id,
-        scheduled_date: selectedDate.toISOString().split('T')[0],
-        scheduled_time: timeStr,
-        service_type: selectedService.name,
-        total_amount: selectedService.price,
-        status: 'pending',
-        payment_status: 'pending',
-        notes: customerInfo.notes
       })
 
-      if (!appointment) {
-        throw new Error('Failed to create appointment')
+      const data = await response.json()
+      
+      console.log('Booking API response:', { status: response.status, data })
+
+      if (!response.ok || !data.success) {
+        const errorMessage = data.error || 'Failed to book appointment'
+        console.error('Booking failed:', errorMessage)
+        throw new Error(errorMessage)
       }
 
-      console.log('Booking created successfully:', appointment)
+      console.log('Booking created successfully:', data.appointment)
+      
+      // Immediately refresh booked slots so the newly booked slot is grayed out
+      await refreshBookedSlots()
+      
       setStep(4)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating booking:', error)
-      alert('Failed to book appointment. Please try again.')
+      const errorMessage = error.message || 'Failed to book appointment. Please check the console for details.'
+      alert(errorMessage)
     } finally {
       setSubmitting(false)
     }
@@ -314,7 +430,16 @@ export default function BookingPage({ detailerId }: BookingPageProps) {
               <h2 className="text-lg font-semibold text-foreground mb-4">
                 Choose Your Service
               </h2>
-              {services.map((service) => (
+              {services.length === 0 ? (
+                <div className="text-center py-8 bg-card border border-border rounded-lg">
+                  <Car className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-foreground font-medium mb-2">No services available</p>
+                  <p className="text-sm text-muted-foreground">
+                    This detailer hasn't set up any services yet. Please check back later.
+                  </p>
+                </div>
+              ) : (
+                services.map((service) => (
                 <button
                   key={service.id}
                   onClick={() => handleServiceSelect(service)}
@@ -334,14 +459,23 @@ export default function BookingPage({ detailerId }: BookingPageProps) {
                         <div className="text-sm text-muted-foreground">
                           {service.duration} minutes
                         </div>
+                        {service.description && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {service.description}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="font-bold text-foreground">${service.price}</div>
+                      {service.category && service.category !== 'General' && (
+                        <div className="text-xs text-muted-foreground">{service.category}</div>
+                      )}
                     </div>
                   </div>
                 </button>
-              ))}
+              ))
+              )}
             </div>
           )}
 
@@ -408,6 +542,7 @@ export default function BookingPage({ detailerId }: BookingPageProps) {
                           key={time}
                           onClick={() => isAvailable && setSelectedTime(time)}
                           disabled={!isAvailable}
+                          title={!isAvailable ? 'This time slot is already booked' : undefined}
                           className={`p-3 rounded-lg border text-center transition-colors ${
                             isSelected
                               ? 'text-primary'
@@ -522,12 +657,23 @@ export default function BookingPage({ detailerId }: BookingPageProps) {
               </div>
 
               <Button 
-                onClick={handleBookingSubmit}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  console.log('Button clicked!')
+                  handleBookingSubmit()
+                }}
                 className="w-full"
                 disabled={!customerInfo.name || !customerInfo.phone || !customerInfo.address || submitting}
                 style={{
-                  backgroundColor: branding?.primary_color || '#3B82F6',
-                  fontFamily: branding?.font_family || undefined
+                  backgroundColor: submitting || !customerInfo.name || !customerInfo.phone || !customerInfo.address
+                    ? undefined
+                    : (branding?.primary_color || '#3B82F6'),
+                  fontFamily: branding?.font_family || undefined,
+                  cursor: submitting || !customerInfo.name || !customerInfo.phone || !customerInfo.address
+                    ? 'not-allowed'
+                    : 'pointer'
                 }}
               >
                 {submitting ? (

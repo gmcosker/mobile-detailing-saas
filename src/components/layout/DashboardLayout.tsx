@@ -1,6 +1,7 @@
 'use client'
 
 import { ReactNode } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { 
   Calendar,
@@ -11,7 +12,8 @@ import {
   Menu,
   Bell,
   Settings,
-  Tag
+  Tag,
+  LogOut
 } from 'lucide-react'
 
 interface DashboardLayoutProps {
@@ -20,6 +22,8 @@ interface DashboardLayoutProps {
 }
 
 export default function DashboardLayout({ children, title = "Dashboard" }: DashboardLayoutProps) {
+  const router = useRouter()
+
   // Determine which page is active based on the title
   const getActivePage = () => {
     switch (title.toLowerCase()) {
@@ -47,6 +51,31 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
 
   const activePage = getActivePage()
 
+  const handleSignOut = async () => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      
+      // Call logout API if token exists
+      if (token) {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+      }
+    } catch (error) {
+      console.error('Logout error:', error)
+    } finally {
+      // Clear token from localStorage
+      localStorage.removeItem('auth_token')
+      
+      // Redirect to login page
+      router.push('/login')
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Mobile Header */}
@@ -68,13 +97,21 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
                 <Settings className="h-5 w-5" />
               </a>
             </Button>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={handleSignOut}
+              title="Sign Out"
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
           </div>
         </div>
       </header>
 
       {/* Desktop Sidebar (hidden on mobile) */}
-      <aside className="hidden md:block fixed left-0 top-0 bottom-0 w-64 bg-card border-r border-border z-40">
-        <div className="p-6">
+      <aside className="hidden md:block fixed left-0 top-0 bottom-0 w-64 bg-card border-r border-border z-40 flex flex-col">
+        <div className="p-6 flex-1">
           <h2 className="text-xl font-bold text-foreground mb-8">
             Mobile Detailing
           </h2>
@@ -88,6 +125,17 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
             <SidebarButton icon={MessageSquare} label="SMS" href="/sms" active={activePage === '/sms'} />
             <SidebarButton icon={Settings} label="Brand Settings" href="/branding" active={activePage === '/branding'} />
           </nav>
+        </div>
+        
+        <div className="p-6 border-t border-border">
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-3"
+            onClick={handleSignOut}
+          >
+            <LogOut className="h-5 w-5" />
+            <span>Sign Out</span>
+          </Button>
         </div>
       </aside>
 

@@ -42,3 +42,5 @@ INSERT INTO branding (detailer_id, primary_color, secondary_color, text_color, f
     'Inter'
 );
 
+
+

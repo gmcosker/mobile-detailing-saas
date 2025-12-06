@@ -1,19 +1,21 @@
 import BookingPage from '@/components/booking/BookingPage'
 
 interface BookingPageProps {
-  params: {
+  params: Promise<{
     detailerId: string
-  }
+  }>
 }
 
-export default function Book({ params }: BookingPageProps) {
-  return <BookingPage detailerId={params.detailerId} />
+export default async function Book({ params }: BookingPageProps) {
+  const { detailerId } = await params
+  return <BookingPage detailerId={detailerId} />
 }
 
 // Generate metadata for SEO
 export async function generateMetadata({ params }: BookingPageProps) {
+  const { detailerId } = await params
   // In a real app, we'd fetch the detailer's business name from the database
-  const businessName = params.detailerId.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())
+  const businessName = detailerId.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())
   
   return {
     title: `Book ${businessName} - Mobile Auto Detailing`,

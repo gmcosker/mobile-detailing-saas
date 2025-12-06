@@ -1,6 +1,9 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { 
   Users,
   Plus,
@@ -9,7 +12,8 @@ import {
   MoreHorizontal,
   Phone,
   Mail,
-  MapPin
+  MapPin,
+  X
 } from 'lucide-react'
 
 // Mock data for now - this will come from the database later
@@ -57,6 +61,114 @@ const mockCustomers = [
 ]
 
 export default function CustomersPage() {
+  const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false)
+  const [customers, setCustomers] = useState(mockCustomers)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isFetching, setIsFetching] = useState(false)
+
+  // Fetch customers from API
+  const fetchCustomers = async () => {
+    setIsFetching(true)
+    try {
+      const token = localStorage.getItem('auth_token')
+      
+      if (!token) {
+        console.error('No auth token found')
+        return
+      }
+
+      const response = await fetch('/api/customers', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      const data = await response.json()
+
+      console.log('Customers API response:', data)
+
+      if (response.ok && data.success && data.customers) {
+        // Transform API data to match component format
+        const transformedCustomers = data.customers.map((customer: any) => ({
+          id: customer.id,
+          name: customer.name,
+          phone: customer.phone,
+          email: customer.email || '',
+          address: customer.address || '',
+          totalSpent: 0, // This would come from appointments in a real implementation
+          lastVisit: customer.updated_at ? new Date(customer.updated_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          status: 'active'
+        }))
+        setCustomers(transformedCustomers)
+        console.log('Set customers:', transformedCustomers)
+      } else {
+        console.error('Failed to fetch customers:', data.error)
+        // Set empty array if API fails
+        setCustomers([])
+      }
+    } catch (error) {
+      console.error('Error fetching customers:', error)
+      // Set empty array on error instead of keeping mock data
+      setCustomers([])
+    } finally {
+      setIsFetching(false)
+    }
+  }
+
+  // Fetch customers on mount
+  useEffect(() => {
+    fetchCustomers()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleAddCustomer = async (customerData: {
+    name: string
+    email?: string
+    phone: string
+    address?: string
+    notes?: string
+  }) => {
+    setIsLoading(true)
+    try {
+      const token = localStorage.getItem('auth_token')
+      
+      if (!token) {
+        throw new Error('Not authenticated. Please log in again.')
+      }
+
+      console.log('Sending customer data:', customerData)
+      console.log('Using token:', token.substring(0, 20) + '...')
+
+      const response = await fetch('/api/customers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(customerData),
+      })
+
+      const data = await response.json()
+
+      console.log('Customer API response:', data)
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to create customer')
+      }
+
+      // Refresh the customer list
+      await fetchCustomers()
+
+      setIsAddCustomerOpen(false)
+    } catch (error: any) {
+      console.error('Error adding customer:', error)
+      alert(error.message || 'Failed to add customer. Please check the console for details.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -65,7 +177,10 @@ export default function CustomersPage() {
           <h1 className="text-2xl font-bold text-foreground">Customers</h1>
           <p className="text-muted-foreground">Manage your customer database</p>
         </div>
-        <Button className="w-full sm:w-auto">
+        <Button 
+          className="w-full sm:w-auto"
+          onClick={() => setIsAddCustomerOpen(true)}
+        >
           <Plus className="h-4 w-4 mr-2" />
           Add Customer
         </Button>
@@ -91,25 +206,25 @@ export default function CustomersPage() {
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <StatCard
           title="Total Customers"
-          value={mockCustomers.length.toString()}
+          value={customers.length.toString()}
           icon={Users}
           color="blue"
         />
         <StatCard
           title="Active Customers"
-          value={mockCustomers.filter(c => c.status === 'active').length.toString()}
+          value={customers.filter(c => c.status === 'active').length.toString()}
           icon={Users}
           color="green"
         />
         <StatCard
           title="This Month"
-          value="12"
+          value={customers.length.toString()}
           icon={Users}
           color="purple"
         />
         <StatCard
           title="Revenue"
-          value={`$${mockCustomers.reduce((sum, c) => sum + c.totalSpent, 0)}`}
+          value={`$${customers.reduce((sum, c) => sum + c.totalSpent, 0)}`}
           icon={Users}
           color="orange"
         />
@@ -120,12 +235,34 @@ export default function CustomersPage() {
         <div className="p-4 border-b border-border">
           <h3 className="font-semibold text-foreground">Customer List</h3>
         </div>
-        <div className="divide-y divide-border">
-          {mockCustomers.map((customer) => (
-            <CustomerRow key={customer.id} customer={customer} />
-          ))}
-        </div>
+        {isFetching ? (
+          <div className="p-8 text-center text-muted-foreground">
+            Loading customers...
+          </div>
+        ) : customers.length === 0 ? (
+          <div className="p-8 text-center">
+            <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+            <p className="text-muted-foreground mb-2">No customers yet</p>
+            <p className="text-sm text-muted-foreground">Click "Add Customer" to get started</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-border">
+            {customers.map((customer) => (
+              <CustomerRow key={customer.id} customer={customer} />
+            ))}
+          </div>
+        )}
       </div>
+
+      {/* Add Customer Modal */}
+      {isAddCustomerOpen && (
+        <AddCustomerModal
+          isOpen={isAddCustomerOpen}
+          onClose={() => setIsAddCustomerOpen(false)}
+          onSave={handleAddCustomer}
+          isLoading={isLoading}
+        />
+      )}
     </div>
   )
 }
@@ -184,14 +321,18 @@ function CustomerRow({ customer }: { customer: any }) {
               <Phone className="h-3 w-3" />
               {customer.phone}
             </div>
-            <div className="flex items-center gap-1">
-              <Mail className="h-3 w-3" />
-              {customer.email}
-            </div>
-            <div className="flex items-center gap-1">
-              <MapPin className="h-3 w-3" />
-              {customer.address}
-            </div>
+            {customer.email && (
+              <div className="flex items-center gap-1">
+                <Mail className="h-3 w-3" />
+                {customer.email}
+              </div>
+            )}
+            {customer.address && (
+              <div className="flex items-center gap-1">
+                <MapPin className="h-3 w-3" />
+                {customer.address}
+              </div>
+            )}
           </div>
         </div>
         
@@ -203,6 +344,195 @@ function CustomerRow({ customer }: { customer: any }) {
         <Button variant="ghost" size="icon">
           <MoreHorizontal className="h-4 w-4" />
         </Button>
+      </div>
+    </div>
+  )
+}
+
+interface AddCustomerModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onSave: (customer: {
+    name: string
+    email?: string
+    phone: string
+    address?: string
+    notes?: string
+  }) => void
+  isLoading: boolean
+}
+
+function AddCustomerModal({ isOpen, onClose, onSave, isLoading }: AddCustomerModalProps) {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    notes: ''
+  })
+  const [error, setError] = useState('')
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setError('')
+
+    // Validation
+    if (!formData.name.trim()) {
+      setError('Name is required')
+      return
+    }
+
+    if (!formData.phone.trim()) {
+      setError('Phone is required')
+      return
+    }
+
+    // Email validation if provided
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      setError('Invalid email format')
+      return
+    }
+
+    // Call onSave with the form data
+    onSave({
+      name: formData.name.trim(),
+      email: formData.email.trim() || undefined,
+      phone: formData.phone.trim(),
+      address: formData.address.trim() || undefined,
+      notes: formData.notes.trim() || undefined,
+    })
+
+    // Reset form
+    setFormData({
+      name: '',
+      email: '',
+      phone: '',
+      address: '',
+      notes: ''
+    })
+  }
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+    if (error) setError('')
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-card border border-border rounded-lg shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-foreground">Add New Customer</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              disabled={isLoading}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Name */}
+            <div className="space-y-2">
+              <Label htmlFor="name">Name *</Label>
+              <Input
+                id="name"
+                type="text"
+                value={formData.name}
+                onChange={(e) => handleInputChange('name', e.target.value)}
+                placeholder="John Doe"
+                required
+                disabled={isLoading}
+              />
+            </div>
+
+            {/* Phone */}
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone *</Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
+                placeholder="555-123-4567"
+                required
+                disabled={isLoading}
+              />
+            </div>
+
+            {/* Email */}
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                placeholder="john@example.com"
+                disabled={isLoading}
+              />
+            </div>
+
+            {/* Address */}
+            <div className="space-y-2">
+              <Label htmlFor="address">Address</Label>
+              <Input
+                id="address"
+                type="text"
+                value={formData.address}
+                onChange={(e) => handleInputChange('address', e.target.value)}
+                placeholder="123 Main St, City, State 12345"
+                disabled={isLoading}
+              />
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => handleInputChange('notes', e.target.value)}
+                placeholder="Additional notes about this customer..."
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={isLoading}
+                rows={3}
+              />
+            </div>
+
+            {error && (
+              <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3">
+                {error}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={onClose}
+                disabled={isLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="flex-1"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Saving...' : 'Save Customer'}
+              </Button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   )

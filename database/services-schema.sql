@@ -93,3 +93,5 @@ CREATE TRIGGER update_services_updated_at
     BEFORE UPDATE ON services
     FOR EACH ROW
     EXECUTE FUNCTION update_services_updated_at();
+
+
