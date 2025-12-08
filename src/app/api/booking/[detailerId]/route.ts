@@ -228,22 +228,24 @@ export async function POST(
 
     // Resolve detailer UUID (supabase already initialized above)
 
-    const { data: detailerData } = await supabase
+    const { data: detailerData, error: detailerError } = await supabase
       .from('detailers')
       .select('id')
       .eq('detailer_id', params.detailerId)
       .single()
 
-    if (!detailerData) {
+    if (detailerError || !detailerData) {
       return NextResponse.json(
         { success: false, error: 'Detailer not found' },
         { status: 404 }
       )
     }
 
+    const detailerId = (detailerData as { id: string }).id
+
     // Create appointment
     const appointment = await appointmentService.create({
-      detailer_id: detailerData.id,
+      detailer_id: detailerId,
       customer_id: customerRecord.id,
       scheduled_date,
       scheduled_time,
