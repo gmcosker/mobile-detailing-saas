@@ -318,24 +318,10 @@ export default function DashboardHome() {
         <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl border border-white/20 p-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Recent Activity</h2>
           <div className="space-y-4">
-            <ActivityItem
-              icon={CheckCircle}
-              text="Completed detail for John Doe"
-              time="2 hours ago"
-              color="green"
-            />
-            <ActivityItem
-              icon={DollarSign}
-              text="Payment received - $150.00"
-              time="3 hours ago"
-              color="green"
-            />
-            <ActivityItem
-              icon={Calendar}
-              text="New appointment booked"
-              time="5 hours ago"
-              color="blue"
-            />
+            <div className="text-center py-8">
+              <p className="text-gray-600 text-lg">No recent activity</p>
+              <p className="text-gray-500">Activity will appear here as you use the app</p>
+            </div>
           </div>
         </div>
       </div>

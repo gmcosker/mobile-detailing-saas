@@ -6,11 +6,14 @@ import { isValidEmail, isValidPhone, isValidDate, isValidTime } from '@/lib/auth
 // This is a PUBLIC endpoint (no auth required)
 export async function POST(
   request: NextRequest,
-  { params }: { params: { detailerId: string } }
+  { params }: { params: Promise<{ detailerId: string }> }
 ) {
   try {
+    // In Next.js 15+, params is a Promise that needs to be awaited
+    const { detailerId } = await params
+    
     // Verify detailer exists and is active
-    const detailer = await detailerService.getByDetailerId(params.detailerId)
+    const detailer = await detailerService.getByDetailerId(detailerId)
     
     if (!detailer || !detailer.is_active) {
       return NextResponse.json(
@@ -96,7 +99,8 @@ export async function POST(
     let selectedService: any = null
     
     // Try to find service in database first
-    const services = await serviceService.getByDetailerId(params.detailerId)
+    // Use service role key to bypass RLS since this is a public endpoint
+    const services = await serviceService.getByDetailerId(detailerId, true)
     selectedService = services.find(s => s.id === serviceId || s.id.toString() === serviceId.toString())
     
     // If service not found in database, use serviceName and servicePrice from request (default services)
@@ -126,7 +130,7 @@ export async function POST(
 
     // Verify time slot is available
     const bookedSlots = await appointmentService.getBookedSlots(
-      params.detailerId,
+      detailerId,
       scheduled_date,
       scheduled_date
     )
@@ -227,11 +231,13 @@ export async function POST(
     }
 
     // Resolve detailer UUID (supabase already initialized above)
+    // Note: detailerId here is the string identifier (e.g., "garritys-3rd-test-account")
+    // We need to get the UUID for the appointment
 
     const { data: detailerData, error: detailerError } = await supabase
       .from('detailers')
       .select('id')
-      .eq('detailer_id', params.detailerId)
+      .eq('detailer_id', detailerId)
       .single()
 
     if (detailerError || !detailerData) {
@@ -241,11 +247,11 @@ export async function POST(
       )
     }
 
-    const detailerId = (detailerData as { id: string }).id
+    const detailerUuid = (detailerData as { id: string }).id
 
     // Create appointment
     const appointment = await appointmentService.create({
-      detailer_id: detailerId,
+      detailer_id: detailerUuid,
       customer_id: customerRecord.id,
       scheduled_date,
       scheduled_time,

@@ -7,7 +7,17 @@ interface BookingPageProps {
 }
 
 export default async function Book({ params }: BookingPageProps) {
-  const { detailerId } = await params
+  const resolvedParams = await params
+  const { detailerId } = resolvedParams
+  
+  // Debug: Log the detailerId to ensure it's being extracted correctly
+  console.log('Book page: detailerId from params:', detailerId)
+  
+  if (!detailerId) {
+    console.error('Book page: detailerId is missing from params!', resolvedParams)
+    return <div>Error: Detailer ID not found in URL</div>
+  }
+  
   return <BookingPage detailerId={detailerId} />
 }
 

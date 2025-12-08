@@ -6,9 +6,12 @@ import { getSupabaseClient } from '@/lib/supabase'
 // GET /api/appointments/[id] - Get single appointment
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // In Next.js 15+, params is a Promise that needs to be awaited
+    const { id } = await params
+    
     // Verify authentication
     const auth = await verifyAuth(request)
     if (!auth) {
@@ -18,7 +21,7 @@ export async function GET(
       )
     }
 
-    const appointment = await appointmentService.getById(params.id)
+    const appointment = await appointmentService.getById(id)
 
     if (!appointment) {
       return NextResponse.json(
@@ -57,9 +60,12 @@ export async function GET(
 // PATCH /api/appointments/[id] - Update appointment
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // In Next.js 15+, params is a Promise that needs to be awaited
+    const { id } = await params
+    
     // Verify authentication
     const auth = await verifyAuth(request)
     if (!auth) {
@@ -70,7 +76,7 @@ export async function PATCH(
     }
 
     // Get existing appointment to verify ownership
-    const existingAppointment = await appointmentService.getById(params.id)
+    const existingAppointment = await appointmentService.getById(id)
 
     if (!existingAppointment) {
       return NextResponse.json(
@@ -120,7 +126,7 @@ export async function PATCH(
     if (payment_status !== undefined) updates.payment_status = payment_status
 
     // Update appointment
-    const appointment = await appointmentService.update(params.id, updates)
+    const appointment = await appointmentService.update(id, updates)
 
     if (!appointment) {
       return NextResponse.json(
@@ -146,9 +152,12 @@ export async function PATCH(
 // DELETE /api/appointments/[id] - Permanently delete cancelled appointment
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // In Next.js 15+, params is a Promise that needs to be awaited
+    const { id } = await params
+    
     // Verify authentication
     const auth = await verifyAuth(request)
     if (!auth) {
@@ -170,7 +179,7 @@ export async function DELETE(
     const { data: existingAppointment, error: fetchError } = await supabase
       .from('appointments')
       .select('id, detailer_id, status')
-      .eq('id', params.id)
+      .eq('id', id)
       .single()
 
     if (fetchError || !existingAppointment) {
@@ -202,7 +211,7 @@ export async function DELETE(
     }
 
     // Permanently delete the appointment
-    const deleted = await appointmentService.delete(params.id)
+    const deleted = await appointmentService.delete(id)
 
     if (!deleted) {
       return NextResponse.json(

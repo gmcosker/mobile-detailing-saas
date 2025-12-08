@@ -7,9 +7,12 @@ import { getSupabaseClient } from '@/lib/supabase'
 // POST /api/appointments/[id]/confirm - Confirm appointment and send notifications
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // In Next.js 15+, params is a Promise that needs to be awaited
+    const { id } = await params
+    
     // Verify authentication
     const auth = await verifyAuth(request)
     if (!auth) {
@@ -20,7 +23,7 @@ export async function POST(
     }
 
     // Get existing appointment
-    const appointment = await appointmentService.getById(params.id)
+    const appointment = await appointmentService.getById(id)
 
     if (!appointment) {
       return NextResponse.json(
@@ -88,7 +91,7 @@ export async function POST(
     }
 
     // Update appointment status to confirmed
-    const updatedAppointment = await appointmentService.update(params.id, {
+    const updatedAppointment = await appointmentService.update(id, {
       status: 'confirmed'
     })
 
@@ -117,6 +120,7 @@ export async function POST(
     let smsResult = { success: false, error: '' }
     if (customer.phone) {
       try {
+        console.log(`[CONFIRM] Attempting to send SMS confirmation to ${customer.phone}`)
         smsResult = await smsService.sendAppointmentConfirmation(
           customer.phone,
           customer.name,
@@ -125,11 +129,16 @@ export async function POST(
           appointmentTime,
           detailer.business_name
         )
-        console.log('SMS confirmation sent:', smsResult)
+        console.log('[CONFIRM] SMS result:', smsResult)
+        if (!smsResult.success) {
+          console.warn('[CONFIRM] SMS failed:', smsResult.error)
+        }
       } catch (smsError: any) {
-        console.error('Error sending SMS confirmation:', smsError)
+        console.error('[CONFIRM] Error sending SMS confirmation:', smsError)
         smsResult = { success: false, error: smsError.message || 'Failed to send SMS' }
       }
+    } else {
+      console.warn('[CONFIRM] No phone number for customer, skipping SMS')
     }
 
     // Send email confirmation (if email exists)

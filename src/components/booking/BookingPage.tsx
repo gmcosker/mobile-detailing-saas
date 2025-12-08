@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { 
   Calendar,
@@ -17,7 +18,7 @@ import {
 // Removed direct database service imports - using API endpoints instead
 
 interface BookingPageProps {
-  detailerId: string
+  detailerId?: string
 }
 
 // Default services if detailer data fails to load
@@ -39,7 +40,13 @@ const nextSevenDays = Array.from({ length: 7 }, (_, i) => {
   return date
 })
 
-export default function BookingPage({ detailerId }: BookingPageProps) {
+export default function BookingPage({ detailerId: detailerIdProp }: BookingPageProps) {
+  // Get detailerId from props or URL params (fallback for Next.js 15/16)
+  const params = useParams()
+  const detailerId = detailerIdProp || (params?.detailerId as string) || ''
+  
+  console.log('BookingPage render - detailerIdProp:', detailerIdProp, 'params.detailerId:', params?.detailerId, 'final detailerId:', detailerId)
+  
   const [step, setStep] = useState(1) // 1: Service, 2: Date/Time, 3: Details, 4: Confirmation
   const [selectedService, setSelectedService] = useState<any>(null)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
@@ -55,7 +62,7 @@ export default function BookingPage({ detailerId }: BookingPageProps) {
   // Real data state
   const [detailer, setDetailer] = useState<any>(null)
   const [branding, setBranding] = useState<any>(null)
-  const [services, setServices] = useState(defaultServices)
+  const [services, setServices] = useState<any[]>([]) // Start with empty array, not defaults
   const [bookedSlots, setBookedSlots] = useState<{date: string, time: string}[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -75,6 +82,14 @@ export default function BookingPage({ detailerId }: BookingPageProps) {
   // Load detailer data, branding, services, and booked slots
   useEffect(() => {
     const loadData = async () => {
+      // Guard: Don't make API call if detailerId is missing
+      if (!detailerId) {
+        console.error('BookingPage: detailerId is missing!', detailerId)
+        setLoading(false)
+        return
+      }
+      
+      console.log('BookingPage: Loading data for detailerId:', detailerId)
       setLoading(true)
       try {
         // Calculate date range for booked slots using local timezone
@@ -88,7 +103,9 @@ export default function BookingPage({ detailerId }: BookingPageProps) {
         const endDate = formatDateLocal(nextSevenDays[6])
 
         // Load all booking data from API
-        const response = await fetch(`/api/booking/${detailerId}/info?startDate=${startDate}&endDate=${endDate}`)
+        const apiUrl = `/api/booking/${detailerId}/info?startDate=${startDate}&endDate=${endDate}`
+        console.log('BookingPage: Fetching from:', apiUrl)
+        const response = await fetch(apiUrl)
         const data = await response.json()
 
         if (response.ok && data.success) {
@@ -101,28 +118,23 @@ export default function BookingPage({ detailerId }: BookingPageProps) {
           }
 
           // Always use services from the database (even if empty array)
-          // Only use defaults if the API call completely fails
+          // Never use defaults if API call succeeds
           if (data.services !== undefined) {
-            if (data.services.length > 0) {
-              // Transform database services to match booking page format
-              const transformedServices = data.services.map((service: any) => ({
-                id: service.id,
-                name: service.name,
-                price: parseFloat(service.price) || 0,
-                duration: service.duration || 30,
-                description: service.description || null,
-                category: service.category || 'General'
-              }))
-              setServices(transformedServices)
-              console.log('Loaded services from database:', transformedServices)
-            } else {
-              // Detailer has no services - show empty state
-              setServices([])
-              console.log('Detailer has no services configured')
-            }
+            // Transform database services to match booking page format
+            const transformedServices = data.services.map((service: any) => ({
+              id: service.id,
+              name: service.name,
+              price: parseFloat(service.price) || 0,
+              duration: service.duration || 30,
+              description: service.description || null,
+              category: service.category || 'General'
+            }))
+            setServices(transformedServices)
+            console.log(`Loaded ${transformedServices.length} services from database for detailer:`, detailerId, transformedServices)
           } else {
-            // Services field not in response - keep defaults as fallback
-            console.warn('Services field missing from API response, using defaults')
+            // Services field not in response - set empty array
+            console.warn('Services field missing from API response, setting empty array')
+            setServices([])
           }
 
           if (data.bookedSlots) {
@@ -130,13 +142,15 @@ export default function BookingPage({ detailerId }: BookingPageProps) {
           }
         } else {
           console.error('Error loading booking data:', data.error)
-          // Only use defaults if API call completely fails
-          console.warn('API call failed, using default services as fallback')
+          // API call failed - set empty array, don't use defaults
+          setServices([])
+          console.warn('API call failed, setting empty services array')
         }
       } catch (error) {
         console.error('Error loading booking data:', error)
-        // Continue with defaults - API will validate on submit
-        console.warn('Continuing with default services due to error')
+        // Set empty array on error - API will validate on submit
+        setServices([])
+        console.warn('Error occurred, setting empty services array')
       } finally {
         setLoading(false)
       }

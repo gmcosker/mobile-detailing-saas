@@ -581,9 +581,36 @@ export const formatTime = (time: string): string => {
 // Services operations
 export const serviceService = {
   // Get all services for a detailer
-  async getByDetailerId(detailerId: string): Promise<Service[]> {
-    const supabase = getSupabaseClient()
-    if (!supabase) return []
+  // Use service role key if available to bypass RLS for public booking pages
+  async getByDetailerId(detailerId: string, useServiceRole: boolean = false): Promise<Service[]> {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    if (!supabaseUrl) {
+      console.error('Supabase URL not configured')
+      return []
+    }
+    
+    // Use service role key for public endpoints (bypasses RLS)
+    let supabase = getSupabaseClient()
+    if (useServiceRole) {
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+      if (serviceRoleKey) {
+        const { createClient } = await import('@supabase/supabase-js')
+        supabase = createClient(supabaseUrl, serviceRoleKey, {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false
+          }
+        })
+        console.log('Using service role key to bypass RLS for services query')
+      } else {
+        console.warn('SUPABASE_SERVICE_ROLE_KEY not found! RLS may block service access.')
+      }
+    }
+    
+    if (!supabase) {
+      console.error('Supabase client not available')
+      return []
+    }
     
     let detailerUuid = detailerId
     
@@ -594,18 +621,20 @@ export const serviceService = {
       // detailerId is a string identifier, need to look up the UUID
       const { data: detailer, error: detailerError } = await supabase
         .from('detailers')
-        .select('id')
+        .select('id, detailer_id')
         .eq('detailer_id', detailerId)
         .single()
       
       if (detailerError || !detailer) {
-        console.error('Error finding detailer:', detailerError)
+        console.error('Error finding detailer for detailer_id:', detailerId, detailerError)
         return []
       }
       
+      console.log('Found detailer:', detailer.detailer_id, 'UUID:', detailer.id)
       detailerUuid = detailer.id
     }
     
+    // Get only active services
     const { data, error } = await supabase
       .from('services')
       .select('*')
@@ -614,10 +643,14 @@ export const serviceService = {
       .order('display_order', { ascending: true })
     
     if (error) {
-      console.error('Error fetching services:', error)
+      console.error('Error fetching active services for detailer UUID:', detailerUuid, error)
       return []
     }
     
+    console.log(`Found ${data?.length || 0} active services for detailer UUID: ${detailerUuid}`)
+    if (data && data.length > 0) {
+      console.log('Active services:', data.map(s => ({ id: s.id, name: s.name, price: s.price })))
+    }
     return data || []
   },
 

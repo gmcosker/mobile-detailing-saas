@@ -7,9 +7,12 @@ import { getSupabaseClient } from '@/lib/supabase'
 // POST /api/appointments/[id]/reschedule - Reschedule appointment and notify customer
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // In Next.js 15+, params is a Promise that needs to be awaited
+    const { id } = await params
+    
     // Verify authentication
     const auth = await verifyAuth(request)
     if (!auth) {
@@ -20,7 +23,7 @@ export async function POST(
     }
 
     // Get existing appointment
-    const appointment = await appointmentService.getById(params.id)
+    const appointment = await appointmentService.getById(id)
 
     if (!appointment) {
       return NextResponse.json(

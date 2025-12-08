@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuth } from '@/lib/auth'
-import { customerService } from '@/lib/database'
+import { customerService, appointmentService } from '@/lib/database'
 
 // GET /api/customers - List customers for a detailer
 export async function GET(request: NextRequest) {
@@ -28,20 +28,9 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get customers - use getAll for now since customers aren't directly linked to detailers
-    // In production, you might want to add a detailer_id to customers table
-    // For MVP, we'll get all customers (they'll be filtered by appointments when needed)
-    let customers = await customerService.getAll(limit)
-    
-    // If search is provided, filter customers
-    if (search) {
-      const searchLower = search.toLowerCase()
-      customers = customers.filter(c => 
-        c.name.toLowerCase().includes(searchLower) ||
-        c.email?.toLowerCase().includes(searchLower) ||
-        c.phone.includes(search)
-      )
-    }
+    // Get customers filtered by detailer through appointments
+    // This ensures each detailer only sees their own customers
+    const customers = await customerService.getByDetailer(auth.detailerId, search, limit)
 
     return NextResponse.json({
       success: true,
@@ -115,6 +104,56 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'Failed to create customer' },
         { status: 500 }
       )
+    }
+
+    // Link customer to detailer by creating a placeholder appointment
+    // This ensures the customer appears in the detailer's customer list
+    // The appointment is set far in the future and won't show in normal schedules
+    const farFutureDate = new Date()
+    farFutureDate.setFullYear(farFutureDate.getFullYear() + 10) // 10 years in the future
+    const placeholderDate = farFutureDate.toISOString().split('T')[0] // YYYY-MM-DD format
+
+    // Resolve detailer UUID from detailerId
+    const { getSupabaseClient } = await import('@/lib/supabase')
+    const supabase = getSupabaseClient()
+    if (!supabase) {
+      return NextResponse.json(
+        { success: false, error: 'Database connection failed' },
+        { status: 500 }
+      )
+    }
+
+    // Get detailer UUID
+    const { data: detailerData } = await supabase
+      .from('detailers')
+      .select('id')
+      .eq('detailer_id', auth.detailerId)
+      .single()
+
+    if (!detailerData) {
+      return NextResponse.json(
+        { success: false, error: 'Detailer not found' },
+        { status: 404 }
+      )
+    }
+
+    // Create placeholder appointment to link customer to detailer
+    const placeholderAppointment = await appointmentService.create({
+      detailer_id: detailerData.id,
+      customer_id: customer.id,
+      scheduled_date: placeholderDate,
+      scheduled_time: '00:00:00',
+      service_type: 'Customer Added Manually',
+      status: 'pending',
+      notes: 'Placeholder appointment - Customer added manually by detailer',
+      total_amount: null,
+      payment_status: null
+    })
+
+    // Even if placeholder appointment creation fails, return the customer
+    // The customer was created successfully, and they can be linked later via a real appointment
+    if (!placeholderAppointment) {
+      console.warn('Failed to create placeholder appointment for customer:', customer.id)
     }
 
     return NextResponse.json({

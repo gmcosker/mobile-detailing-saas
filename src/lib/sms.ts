@@ -82,6 +82,25 @@ export const smsService = {
       // Send immediately
       const client = await getTwilioClient()
       if (!client) {
+        // Check if credentials are missing
+        const hasAccountSid = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_ACCOUNT_SID !== 'ACdummy'
+        const hasAuthToken = process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_AUTH_TOKEN !== 'dummy_token'
+        const hasPhoneNumber = process.env.TWILIO_PHONE_NUMBER && process.env.TWILIO_PHONE_NUMBER !== '+1234567890'
+        
+        if (!hasAccountSid || !hasAuthToken || !hasPhoneNumber) {
+          console.warn('[SMS] Twilio credentials not configured. Missing:', {
+            accountSid: !hasAccountSid,
+            authToken: !hasAuthToken,
+            phoneNumber: !hasPhoneNumber
+          })
+          console.log(`[DEMO MODE] SMS would be sent: ${message} to ${formattedPhone}`)
+          return {
+            success: false,
+            error: 'Twilio credentials not configured. Please add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER to your environment variables.',
+            messageId: `demo_${Date.now()}`,
+          }
+        }
+        
         // Demo mode - simulate success
         console.log(`[DEMO MODE] SMS would be sent: ${message} to ${formattedPhone}`)
         return {
@@ -90,24 +109,35 @@ export const smsService = {
         }
       }
 
+      console.log(`[SMS] Attempting to send SMS to ${formattedPhone} from ${twilioPhoneNumber}`)
+      console.log(`[SMS] Original phone number: "${to}", Cleaned: "${cleanPhone}", Formatted: "${formattedPhone}"`)
       const result = await client.messages.create({
         body: message,
         from: twilioPhoneNumber,
         to: formattedPhone,
       })
 
+      console.log(`[SMS] Successfully sent SMS. Message SID: ${result.sid}`)
+      console.log(`[SMS] Message status: ${result.status}, To: ${result.to}, From: ${result.from}`)
       return {
         success: true,
         messageId: result.sid,
       }
     } catch (error: any) {
-      console.error('SMS send error:', error)
+      console.error('[SMS] Error sending SMS:', error)
+      console.error('[SMS] Error details:', {
+        message: error.message,
+        code: error.code,
+        status: error.status,
+        moreInfo: error.moreInfo
+      })
       
       // For demo purposes, simulate success when Twilio credentials aren't real
-      if (error.message?.includes('ACdummy') || process.env.NODE_ENV === 'development') {
+      if (error.message?.includes('ACdummy') || (process.env.NODE_ENV === 'development' && !process.env.TWILIO_ACCOUNT_SID)) {
         console.log(`[DEMO MODE] SMS would be sent: ${message} to ${to}`)
         return {
-          success: true,
+          success: false,
+          error: 'Twilio credentials not configured',
           messageId: `demo_${Date.now()}`,
         }
       }
