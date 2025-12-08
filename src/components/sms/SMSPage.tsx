@@ -18,74 +18,75 @@ import {
   AlertTriangle
 } from 'lucide-react'
 
-// Mock data for appointments and SMS history
-const mockAppointments = [
-  {
-    id: '1',
-    customerName: 'Alice Brown',
-    customerPhone: '(555) 111-2222',
-    serviceType: 'Full Detail',
-    scheduledDateTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
-    status: 'confirmed',
-    reminderSent: false,
-    amount: 150
-  },
-  {
-    id: '2',
-    customerName: 'Bob Green',
-    customerPhone: '(555) 333-4444',
-    serviceType: 'Wash & Wax',
-    scheduledDateTime: new Date(Date.now() + 1.5 * 24 * 60 * 60 * 1000), // 1.5 days from now
-    status: 'confirmed',
-    reminderSent: false,
-    amount: 45
-  },
-  {
-    id: '3',
-    customerName: 'Carol White',
-    customerPhone: '(555) 555-6666',
-    serviceType: 'Interior Detail',
-    scheduledDateTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
-    status: 'confirmed',
-    reminderSent: true,
-    amount: 75
-  }
-]
-
-const mockSMSHistory = [
-  {
-    id: 'sms_1',
-    customerName: 'Alice Brown',
-    customerPhone: '(555) 111-2222',
-    message: 'Hi Alice! This is a reminder that your Full Detail appointment is tomorrow at 2:00 PM.',
-    type: 'reminder',
-    status: 'delivered',
-    sentAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-  },
-  {
-    id: 'sms_2',
-    customerName: 'Bob Green',
-    customerPhone: '(555) 333-4444',
-    message: 'Hi Bob! Your Wash & Wax appointment is confirmed for tomorrow at 10:00 AM.',
-    type: 'confirmation',
-    status: 'delivered',
-    sentAt: new Date(Date.now() - 4 * 60 * 60 * 1000), // 4 hours ago
-  },
-  {
-    id: 'sms_3',
-    customerName: 'Carol White',
-    customerPhone: '(555) 555-6666',
-    message: 'Hi Carol! This is Premium Auto Detailing. I\'m on my way and should arrive in about 15 minutes.',
-    type: 'onmyway',
-    status: 'delivered',
-    sentAt: new Date(Date.now() - 6 * 60 * 60 * 1000), // 6 hours ago
-  }
-]
-
 export default function SMSPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
-  const [smsHistory, setSMSHistory] = useState(mockSMSHistory)
-  const [appointments, setAppointments] = useState(mockAppointments)
+  const [smsHistory, setSMSHistory] = useState<any[]>([])
+  const [appointments, setAppointments] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [businessName, setBusinessName] = useState('Your Business')
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem('auth_token')
+        if (!token) {
+          console.error('No auth token found')
+          setLoading(false)
+          return
+        }
+
+        // Fetch user's business name
+        const userResponse = await fetch('/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        if (userResponse.ok) {
+          const userData = await userResponse.json()
+          if (userData.success && userData.user) {
+            setBusinessName(userData.user.business_name || 'Your Business')
+          }
+        }
+
+        // Fetch appointments (only confirmed/upcoming ones for SMS)
+        const appointmentsResponse = await fetch('/api/appointments?status=confirmed&limit=50', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+
+        if (appointmentsResponse.ok) {
+          const appointmentsData = await appointmentsResponse.json()
+          if (appointmentsData.success && appointmentsData.appointments) {
+            // Transform appointments to match expected format
+            const transformedAppointments = appointmentsData.appointments
+              .filter((apt: any) => {
+                // Only show future appointments
+                const aptDate = new Date(`${apt.scheduled_date}T${apt.scheduled_time}`)
+                return aptDate > new Date()
+              })
+              .map((apt: any) => ({
+                id: apt.id,
+                customerName: apt.customers?.name || 'Customer',
+                customerPhone: apt.customers?.phone || '',
+                serviceType: apt.service_type || 'Service',
+                scheduledDateTime: new Date(`${apt.scheduled_date}T${apt.scheduled_time}`),
+                status: apt.status,
+                reminderSent: apt.reminder_sent || false,
+                amount: apt.total_amount || 0
+              }))
+            setAppointments(transformedAppointments)
+          }
+        }
+
+        // TODO: Fetch SMS history from API when endpoint is available
+        // For now, SMS history will be empty
+        setSMSHistory([])
+      } catch (error) {
+        console.error('Error fetching SMS data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
 
   // Calculate stats
   const totalSMSSent = smsHistory.length
@@ -142,7 +143,7 @@ export default function SMSPage() {
         appointment.customerName,
         appointment.serviceType,
         appointment.scheduledDateTime,
-        'Premium Auto Detailing'
+        businessName
       )
 
       if (result.success) {
@@ -189,7 +190,7 @@ export default function SMSPage() {
           <SMSManager
             customerName={selectedCustomer.customerName}
             customerPhone={selectedCustomer.customerPhone}
-            businessName="Premium Auto Detailing"
+            businessName={businessName}
             appointmentDetails={appointment ? {
               serviceType: appointment.serviceType,
               date: appointment.scheduledDateTime.toLocaleDateString('en-US', {
@@ -204,7 +205,7 @@ export default function SMSPage() {
                 hour12: true
               }),
               amount: appointment.amount,
-              paymentLink: `https://yourapp.com/pay/${appointment.id}`
+              paymentLink: `${window.location.origin}/pay/${appointment.id}`
             } : undefined}
           />
         </div>
@@ -283,7 +284,21 @@ export default function SMSPage() {
         </div>
 
         <div className="divide-y divide-border">
-          {appointments.map((appointment) => {
+          {loading ? (
+            <div className="p-8 text-center">
+              <Clock className="h-8 w-8 text-muted-foreground mx-auto mb-4 animate-spin" />
+              <p className="text-muted-foreground">Loading appointments...</p>
+            </div>
+          ) : appointments.length === 0 ? (
+            <div className="p-8 text-center">
+              <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No upcoming appointments</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Confirmed appointments will appear here for SMS reminders
+              </p>
+            </div>
+          ) : (
+            appointments.map((appointment) => {
             const needsReminder = reminderScheduler.needsReminder(appointment.scheduledDateTime)
             const appointmentDate = appointment.scheduledDateTime.toLocaleDateString('en-US', {
               month: 'short',
@@ -340,7 +355,7 @@ export default function SMSPage() {
                 </div>
               </div>
             )
-          })}
+          }))}
         </div>
       </div>
 
@@ -354,7 +369,16 @@ export default function SMSPage() {
         </div>
 
         <div className="divide-y divide-border">
-          {smsHistory.map((sms) => (
+          {smsHistory.length === 0 ? (
+            <div className="p-8 text-center">
+              <MessageSquare className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No SMS history</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                SMS messages sent through the system will appear here
+              </p>
+            </div>
+          ) : (
+            smsHistory.map((sms) => (
             <div key={sms.id} className="p-6">
               <div className="flex items-start justify-between mb-3">
                 <div className="space-y-1">
@@ -379,7 +403,7 @@ export default function SMSPage() {
                 </div>
               </div>
             </div>
-          ))}
+          )))}
         </div>
       </div>
 

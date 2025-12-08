@@ -5,9 +5,12 @@ import { brandingService } from '@/lib/database'
 // GET /api/branding/[detailerId] - Get branding settings for detailer
 export async function GET(
   request: NextRequest,
-  { params }: { params: { detailerId: string } }
+  { params }: { params: Promise<{ detailerId: string }> }
 ) {
   try {
+    // In Next.js 15+, params is a Promise that needs to be awaited
+    const { detailerId } = await params
+    
     // Verify authentication
     const auth = await verifyAuth(request)
     if (!auth) {
@@ -18,7 +21,7 @@ export async function GET(
     }
 
     // Verify user owns detailerId
-    if (params.detailerId !== auth.detailerId) {
+    if (detailerId !== auth.detailerId) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }
@@ -26,7 +29,7 @@ export async function GET(
     }
 
     // Get branding
-    const branding = await brandingService.getByDetailerId(params.detailerId)
+    const branding = await brandingService.getByDetailerId(detailerId)
 
     return NextResponse.json({
       success: true,
@@ -45,9 +48,12 @@ export async function GET(
 // POST /api/branding/[detailerId] - Update branding settings
 export async function POST(
   request: NextRequest,
-  { params }: { params: { detailerId: string } }
+  { params }: { params: Promise<{ detailerId: string }> }
 ) {
   try {
+    // In Next.js 15+, params is a Promise that needs to be awaited
+    const { detailerId } = await params
+    
     // Verify authentication
     const auth = await verifyAuth(request)
     if (!auth) {
@@ -58,7 +64,7 @@ export async function POST(
     }
 
     // Verify user owns detailerId
-    if (params.detailerId !== auth.detailerId) {
+    if (detailerId !== auth.detailerId) {
       return NextResponse.json(
         { success: false, error: 'Forbidden' },
         { status: 403 }
@@ -116,29 +122,29 @@ export async function POST(
     }
 
     // Check if branding exists
-    const existingBranding = await brandingService.getByDetailerId(params.detailerId)
+    const existingBranding = await brandingService.getByDetailerId(detailerId)
 
     let branding
     if (existingBranding) {
       // Update existing branding
-      const updated = await brandingService.update(params.detailerId, updates)
+      const updated = await brandingService.update(detailerId, updates)
       if (!updated) {
         return NextResponse.json(
           { success: false, error: 'Failed to update branding' },
           { status: 500 }
         )
       }
-      branding = await brandingService.getByDetailerId(params.detailerId)
+      branding = await brandingService.getByDetailerId(detailerId)
     } else {
       // Create new branding
-      const created = await brandingService.create(params.detailerId, updates)
+      const created = await brandingService.create(detailerId, updates)
       if (!created) {
         return NextResponse.json(
           { success: false, error: 'Failed to create branding' },
           { status: 500 }
         )
       }
-      branding = await brandingService.getByDetailerId(params.detailerId)
+      branding = await brandingService.getByDetailerId(detailerId)
     }
 
     return NextResponse.json({
