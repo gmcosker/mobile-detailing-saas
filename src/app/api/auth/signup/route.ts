@@ -6,6 +6,7 @@ import { isValidEmail, isValidPhone } from '@/lib/auth'
 import { generateDetailerId } from '@/lib/database'
 
 // POST /api/auth/signup - Create new detailer account
+// Trigger redeploy to pick up environment variables
 export async function POST(request: NextRequest) {
   try {
     const { email, password, business_name, contact_name, phone } = await request.json()
