@@ -19,73 +19,82 @@ import {
   Receipt
 } from 'lucide-react'
 
-// Mock data for payments
-const mockPayments = [
-  {
-    id: 'pi_1234567890',
-    amount: 150.00,
-    status: 'succeeded',
-    customer: 'Jane Smith',
-    service: 'Full Detail',
-    created: '2024-01-16T10:00:00Z',
-    description: 'Full Detail - Mobile Detailing Service'
-  },
-  {
-    id: 'pi_0987654321',
-    amount: 45.00,
-    status: 'succeeded',
-    customer: 'Mike Johnson',
-    service: 'Wash & Wax',
-    created: '2024-01-15T14:00:00Z',
-    description: 'Wash & Wax - Mobile Detailing Service'
-  },
-  {
-    id: 'pi_1122334455',
-    amount: 75.00,
-    status: 'pending',
-    customer: 'Sarah Davis',
-    service: 'Interior Detail',
-    created: '2024-01-14T16:00:00Z',
-    description: 'Interior Detail - Mobile Detailing Service'
-  },
-  {
-    id: 'pi_5566778899',
-    amount: 120.00,
-    status: 'succeeded',
-    customer: 'Tom Wilson',
-    service: 'Exterior Detail',
-    created: '2024-01-13T11:00:00Z',
-    description: 'Exterior Detail - Mobile Detailing Service'
-  }
-]
-
-const mockAppointments = [
-  {
-    id: '1',
-    customerName: 'Alice Brown',
-    customerEmail: 'alice@example.com',
-    customerPhone: '(555) 111-2222',
-    serviceType: 'Full Detail',
-    scheduledDate: '2024-01-17',
-    amount: 150.00,
-    status: 'completed'
-  },
-  {
-    id: '2',
-    customerName: 'Bob Green',
-    customerEmail: null,
-    customerPhone: '(555) 333-4444',
-    serviceType: 'Wash & Wax',
-    scheduledDate: '2024-01-16',
-    amount: 45.00,
-    status: 'completed'
-  }
-]
-
 export default function PaymentsPage() {
   const [selectedAppointment, setSelectedAppointment] = useState<any>(null)
-  const [payments, setPayments] = useState(mockPayments)
+  const [payments, setPayments] = useState<any[]>([])
+  const [appointments, setAppointments] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const [showInvoiceForm, setShowInvoiceForm] = useState(false)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem('auth_token')
+        if (!token) {
+          console.error('No auth token found')
+          setLoading(false)
+          return
+        }
+
+        // Fetch payment history
+        const paymentsResponse = await fetch('/api/payments/history?limit=100', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+
+        if (paymentsResponse.ok) {
+          const paymentsData = await paymentsResponse.json()
+          if (paymentsData.success && paymentsData.payments) {
+            // Transform payment data to match expected format
+            const transformedPayments = paymentsData.payments.map((apt: any) => ({
+              id: apt.stripe_payment_intent_id || apt.id,
+              amount: apt.total_amount || 0,
+              status: apt.payment_status === 'paid' ? 'succeeded' : apt.payment_status || 'pending',
+              customer: apt.customers?.name || 'Unknown Customer',
+              service: apt.service_type || 'Service',
+              created: apt.created_at || apt.scheduled_date,
+              description: `${apt.service_type} - Mobile Detailing Service`
+            }))
+            setPayments(transformedPayments)
+          }
+        }
+
+        // Fetch completed appointments for invoice sending
+        const appointmentsResponse = await fetch('/api/appointments?status=completed&limit=50', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+
+        if (appointmentsResponse.ok) {
+          const appointmentsData = await appointmentsResponse.json()
+          if (appointmentsData.success && appointmentsData.appointments) {
+            // Filter for appointments that might need invoices (completed but not paid)
+            const invoiceAppointments = appointmentsData.appointments
+              .filter((apt: any) => apt.payment_status !== 'paid')
+              .map((apt: any) => ({
+                id: apt.id,
+                customerName: apt.customers?.name || 'Unknown Customer',
+                customerEmail: apt.customers?.email || null,
+                customerPhone: apt.customers?.phone || null,
+                serviceType: apt.service_type || 'Service',
+                scheduledDate: apt.scheduled_date,
+                amount: apt.total_amount || 0,
+                status: apt.status
+              }))
+            setAppointments(invoiceAppointments)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching payments data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
 
   // Calculate stats
   const totalEarnings = payments
@@ -241,33 +250,6 @@ export default function PaymentsPage() {
         </div>
       </div>
 
-      {/* Payment Processor Demo */}
-      <div className="bg-card border border-border rounded-lg">
-        <div className="p-6 border-b border-border">
-          <h3 className="text-lg font-semibold text-foreground">Process Payment</h3>
-          <p className="text-sm text-muted-foreground">
-            Demo payment processing for completed services
-          </p>
-        </div>
-        <div className="p-6">
-          <PaymentProcessor
-            appointmentId="demo-appointment-123"
-            customerName="Jane Smith"
-            customerEmail="jane@example.com"
-            customerPhone="+1234567890"
-            serviceType="Full Detail"
-            amount={150.00}
-            onPaymentSuccess={(paymentId) => {
-              console.log('Payment successful:', paymentId)
-              // Refresh payments list or show success message
-            }}
-            onPaymentError={(error) => {
-              console.error('Payment failed:', error)
-              // Show error message
-            }}
-          />
-        </div>
-      </div>
 
       {/* Quick Actions */}
       <div className="bg-card border border-border rounded-lg">
@@ -279,28 +261,38 @@ export default function PaymentsPage() {
         </div>
 
         <div className="divide-y divide-border">
-          {mockAppointments.map((appointment) => (
-            <div key={appointment.id} className="p-6 flex items-center justify-between">
-              <div className="space-y-1">
-                <div className="font-medium text-foreground">{appointment.customerName}</div>
-                <div className="text-sm text-muted-foreground">
-                  {appointment.serviceType} • {appointment.scheduledDate} • {paymentService.formatCurrency(appointment.amount)}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {appointment.customerPhone}
-                  {appointment.customerEmail && ` • ${appointment.customerEmail}`}
-                </div>
-              </div>
-              <Button
-                onClick={() => setSelectedAppointment(appointment)}
-                size="sm"
-                className="gap-2"
-              >
-                <Send className="h-4 w-4" />
-                Send Invoice
-              </Button>
+          {appointments.length === 0 ? (
+            <div className="p-8 text-center">
+              <Receipt className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No appointments available for invoicing</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Completed appointments that haven't been paid will appear here
+              </p>
             </div>
-          ))}
+          ) : (
+            appointments.map((appointment) => (
+              <div key={appointment.id} className="p-6 flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="font-medium text-foreground">{appointment.customerName}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {appointment.serviceType} • {appointment.scheduledDate} • {paymentService.formatCurrency(appointment.amount)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {appointment.customerPhone}
+                    {appointment.customerEmail && ` • ${appointment.customerEmail}`}
+                  </div>
+                </div>
+                <Button
+                  onClick={() => setSelectedAppointment(appointment)}
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Send className="h-4 w-4" />
+                  Send Invoice
+                </Button>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
@@ -314,45 +306,60 @@ export default function PaymentsPage() {
         </div>
 
         <div className="divide-y divide-border">
-          {payments.map((payment) => (
-            <div key={payment.id} className="p-6 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className={`p-2 rounded-lg ${
-                  payment.status === 'succeeded' 
-                    ? 'bg-green-50 dark:bg-green-950' 
-                    : payment.status === 'pending'
-                    ? 'bg-orange-50 dark:bg-orange-950'
-                    : 'bg-red-50 dark:bg-red-950'
-                }`}>
-                  {payment.status === 'succeeded' ? (
-                    <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  ) : payment.status === 'pending' ? (
-                    <Clock className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-                  ) : (
-                    <CreditCard className="h-5 w-5 text-red-600 dark:text-red-400" />
-                  )}
-                </div>
-                
-                <div className="space-y-1">
-                  <div className="font-medium text-foreground">
-                    {paymentService.formatCurrency(payment.amount)} - {payment.customer}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {payment.service} • {formatDate(payment.created)}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <span className={`text-xs px-2 py-1 rounded-full font-medium ${getStatusColor(payment.status)}`}>
-                  {payment.status}
-                </span>
-                <Button variant="ghost" size="sm">
-                  <Eye className="h-4 w-4" />
-                </Button>
-              </div>
+          {loading ? (
+            <div className="p-8 text-center">
+              <Clock className="h-8 w-8 text-muted-foreground mx-auto mb-4 animate-spin" />
+              <p className="text-muted-foreground">Loading payments...</p>
             </div>
-          ))}
+          ) : payments.length === 0 ? (
+            <div className="p-8 text-center">
+              <Receipt className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No payments found</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Payments will appear here once customers complete their transactions
+              </p>
+            </div>
+          ) : (
+            payments.map((payment) => (
+              <div key={payment.id} className="p-6 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className={`p-2 rounded-lg ${
+                    payment.status === 'succeeded' 
+                      ? 'bg-green-50 dark:bg-green-950' 
+                      : payment.status === 'pending'
+                      ? 'bg-orange-50 dark:bg-orange-950'
+                      : 'bg-red-50 dark:bg-red-950'
+                  }`}>
+                    {payment.status === 'succeeded' ? (
+                      <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    ) : payment.status === 'pending' ? (
+                      <Clock className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+                    ) : (
+                      <CreditCard className="h-5 w-5 text-red-600 dark:text-red-400" />
+                    )}
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <div className="font-medium text-foreground">
+                      {paymentService.formatCurrency(payment.amount)} - {payment.customer}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {payment.service} • {formatDate(payment.created)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${getStatusColor(payment.status)}`}>
+                    {payment.status}
+                  </span>
+                  <Button variant="ghost" size="sm">
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

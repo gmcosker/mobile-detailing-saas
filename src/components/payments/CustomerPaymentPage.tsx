@@ -41,21 +41,62 @@ export default function CustomerPaymentPage({ paymentId }: CustomerPaymentPagePr
       try {
         setLoading(true)
         
-        // For demo purposes, create mock payment data
-        // In production, this would fetch from your API
-        const mockPaymentData: PaymentData = {
-          id: paymentId,
-          amount: 150.00,
-          customerName: 'Jane Smith',
-          serviceType: 'Full Detail',
-          appointmentDate: '2024-01-20',
-          appointmentTime: '10:00 AM',
-          detailerName: 'Mike\'s Mobile Detailing',
-          detailerPhone: '+1 (555) 123-4567',
-          status: 'pending'
+        // Fetch appointment data from public payment API (paymentId is actually appointmentId)
+        const appointmentResponse = await fetch(`/api/payments/info/${paymentId}`)
+        
+        if (!appointmentResponse.ok) {
+          const errorData = await appointmentResponse.json().catch(() => ({}))
+          throw new Error(errorData.error || 'Appointment not found')
         }
 
-        setPaymentData(mockPaymentData)
+        const appointmentData = await appointmentResponse.json()
+        
+        if (!appointmentData.success || !appointmentData.appointment) {
+          throw new Error('Failed to load appointment data')
+        }
+
+        const appointment = appointmentData.appointment
+        
+        // Format date and time
+        const appointmentDate = new Date(appointment.scheduled_date).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        })
+        
+        const [hours, minutes] = appointment.scheduled_time.split(':')
+        const hour = parseInt(hours, 10)
+        const ampm = hour >= 12 ? 'PM' : 'AM'
+        const hour12 = hour % 12 || 12
+        const appointmentTime = `${hour12}:${minutes} ${ampm}`
+
+        // Get detailer info from appointment (if included) or use defaults
+        let detailerName = 'Mobile Detailing Service'
+        let detailerPhone = ''
+        
+        // Check if detailer info is included in appointment response
+        if (appointment.detailers) {
+          detailerName = appointment.detailers.business_name || detailerName
+          detailerPhone = appointment.detailers.phone || ''
+        } else {
+          // If not included, try to fetch it (but this is a public payment page, so we might not have auth)
+          // For now, use defaults - detailer info isn't critical for payment processing
+          console.warn('Detailer info not included in appointment response')
+        }
+
+        const paymentData: PaymentData = {
+          id: paymentId,
+          amount: appointment.total_amount || 0,
+          customerName: appointment.customers?.name || 'Customer',
+          serviceType: appointment.service_type || 'Service',
+          appointmentDate,
+          appointmentTime,
+          detailerName,
+          detailerPhone,
+          status: appointment.payment_status || 'pending'
+        }
+
+        setPaymentData(paymentData)
 
         // Create payment intent
         const response = await fetch('/api/payments/create-intent', {
@@ -64,9 +105,9 @@ export default function CustomerPaymentPage({ paymentId }: CustomerPaymentPagePr
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            amount: mockPaymentData.amount,
+            amount: paymentData.amount,
             appointmentId: paymentId,
-            customerId: 'customer-demo'
+            customerId: appointment.customer_id
           })
         })
 
@@ -78,7 +119,7 @@ export default function CustomerPaymentPage({ paymentId }: CustomerPaymentPagePr
           throw new Error(data.error || 'Failed to create payment intent')
         }
 
-      } catch (err) {
+      } catch (err: any) {
         console.error('Error fetching payment data:', err)
         setError(err.message || 'Failed to load payment information')
       } finally {
