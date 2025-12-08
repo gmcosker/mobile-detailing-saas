@@ -5,9 +5,12 @@ import { photoService, appointmentService } from '@/lib/database'
 // GET /api/photos/appointment/[appointmentId] - Get all photos for an appointment
 export async function GET(
   request: NextRequest,
-  { params }: { params: { appointmentId: string } }
+  { params }: { params: Promise<{ appointmentId: string }> }
 ) {
   try {
+    // In Next.js 15+, params is a Promise that needs to be awaited
+    const { appointmentId } = await params
+    
     // Verify authentication
     const auth = await verifyAuth(request)
     if (!auth) {
@@ -18,7 +21,7 @@ export async function GET(
     }
 
     // Verify appointment exists and user has access
-    const appointment = await appointmentService.getById(params.appointmentId)
+    const appointment = await appointmentService.getById(appointmentId)
     if (!appointment) {
       return NextResponse.json(
         { success: false, error: 'Appointment not found' },
@@ -40,7 +43,7 @@ export async function GET(
     }
 
     // Get photos
-    const photos = await photoService.getByAppointment(params.appointmentId)
+    const photos = await photoService.getByAppointment(appointmentId)
 
     return NextResponse.json({
       success: true,

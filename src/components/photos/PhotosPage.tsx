@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import PhotoUpload from './PhotoUpload'
 import PhotoGallery from './PhotoGallery'
-import { appointmentService } from '@/lib/database'
+// Removed direct database import - using API endpoints instead
 import type { Database } from '@/lib/supabase'
 import { 
   Camera, 
@@ -19,82 +19,55 @@ type Appointment = Database['public']['Tables']['appointments']['Row'] & {
   customers?: Database['public']['Tables']['customers']['Row']
 }
 
-// Mock data for now - in real app this would come from database
-const mockAppointments: Appointment[] = [
-  {
-    id: '1',
-    created_at: '2024-01-15T10:00:00Z',
-    updated_at: '2024-01-15T10:00:00Z',
-    detailer_id: '1',
-    customer_id: '1',
-    scheduled_date: '2024-01-16',
-    scheduled_time: '10:00:00',
-    service_type: 'Full Detail',
-    status: 'completed',
-    total_amount: 150,
-    notes: null,
-    reminder_sent: true,
-    payment_status: 'paid',
-    stripe_payment_intent_id: null,
-    customers: {
-      id: '1',
-      created_at: '2024-01-15T10:00:00Z',
-      updated_at: '2024-01-15T10:00:00Z',
-      name: 'Jane Smith',
-      email: 'jane@example.com',
-      phone: '(555) 123-4567',
-      address: '123 Main St, City, State',
-      notes: null
-    }
-  },
-  {
-    id: '2',
-    created_at: '2024-01-14T14:00:00Z',
-    updated_at: '2024-01-14T14:00:00Z',
-    detailer_id: '1',
-    customer_id: '2',
-    scheduled_date: '2024-01-15',
-    scheduled_time: '14:00:00',
-    service_type: 'Wash & Wax',
-    status: 'in_progress',
-    total_amount: 45,
-    notes: null,
-    reminder_sent: true,
-    payment_status: 'pending',
-    stripe_payment_intent_id: null,
-    customers: {
-      id: '2',
-      created_at: '2024-01-14T14:00:00Z',
-      updated_at: '2024-01-14T14:00:00Z',
-      name: 'Mike Johnson',
-      email: 'mike@example.com',
-      phone: '(555) 987-6543',
-      address: '456 Oak Ave, City, State',
-      notes: null
-    }
-  }
-]
-
 export default function PhotosPage() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null)
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [photoStats, setPhotoStats] = useState({
+    totalPhotos: 0,
+    documentedJobs: 0,
+    beforePhotos: 0,
+    afterPhotos: 0
+  })
 
   useEffect(() => {
-    // Fetch appointments from database
+    // Fetch appointments from API (filtered by authenticated user)
     const fetchAppointments = async () => {
       try {
-        // For now, we'll use a hardcoded detailer ID since we don't have auth yet
-        const detailerId = '7eb3efd9-9676-41d8-bb93-57c484beeccb' // From our sample data
-        console.log('Fetching appointments for detailer:', detailerId)
-        const appointments = await appointmentService.getByDetailer(detailerId)
-        console.log('Fetched appointments:', appointments)
-        setAppointments(appointments)
+        const token = localStorage.getItem('auth_token')
+        if (!token) {
+          console.error('No auth token found')
+          setLoading(false)
+          return
+        }
+
+        const response = await fetch('/api/appointments?limit=100', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch appointments')
+        }
+
+        const data = await response.json()
+        if (data.success && data.appointments) {
+          console.log('Fetched appointments:', data.appointments.length)
+          setAppointments(data.appointments)
+          
+          // Calculate photo stats from appointments (async, don't block)
+          calculatePhotoStats(data.appointments).catch(err => {
+            console.error('Error calculating photo stats:', err)
+          })
+        } else {
+          console.error('Failed to fetch appointments:', data.error)
+          setAppointments([])
+        }
       } catch (error) {
         console.error('Error fetching appointments:', error)
-        // Fallback to mock data if database fails
-        setAppointments(mockAppointments)
+        setAppointments([])
       } finally {
         setLoading(false)
       }
@@ -102,6 +75,54 @@ export default function PhotosPage() {
     
     fetchAppointments()
   }, [])
+
+  const calculatePhotoStats = async (appointments: Appointment[]) => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      if (!token) return
+
+      let totalPhotos = 0
+      let documentedJobs = 0
+      let beforePhotos = 0
+      let afterPhotos = 0
+
+      // Count appointments with photos
+      for (const appointment of appointments) {
+        try {
+          const photoResponse = await fetch(`/api/photos/appointment/${appointment.id}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+
+          if (photoResponse.ok) {
+            const photoData = await photoResponse.json()
+            if (photoData.success && photoData.photos) {
+              const photos = photoData.photos
+              if (photos.length > 0) {
+                documentedJobs++
+                totalPhotos += photos.length
+                beforePhotos += photos.filter((p: any) => p.photo_type === 'before').length
+                afterPhotos += photos.filter((p: any) => p.photo_type === 'after').length
+              }
+            }
+          }
+        } catch (error) {
+          // Skip if photo fetch fails for this appointment
+          console.warn(`Failed to fetch photos for appointment ${appointment.id}:`, error)
+        }
+      }
+
+      setPhotoStats({
+        totalPhotos,
+        documentedJobs,
+        beforePhotos,
+        afterPhotos
+      })
+    } catch (error) {
+      console.error('Error calculating photo stats:', error)
+    }
+  }
 
   // Force refresh photos when navigating back to this page
   useEffect(() => {
@@ -258,7 +279,7 @@ export default function PhotosPage() {
               <Camera className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-foreground">24</div>
+              <div className="text-2xl font-bold text-foreground">{photoStats.totalPhotos}</div>
               <div className="text-sm text-muted-foreground">Total Photos</div>
             </div>
           </div>
@@ -270,7 +291,7 @@ export default function PhotosPage() {
               <Calendar className="h-5 w-5 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-foreground">8</div>
+              <div className="text-2xl font-bold text-foreground">{photoStats.documentedJobs}</div>
               <div className="text-sm text-muted-foreground">Documented Jobs</div>
             </div>
           </div>
@@ -282,7 +303,7 @@ export default function PhotosPage() {
               <User className="h-5 w-5 text-purple-600 dark:text-purple-400" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-foreground">12</div>
+              <div className="text-2xl font-bold text-foreground">{photoStats.beforePhotos}</div>
               <div className="text-sm text-muted-foreground">Before Photos</div>
             </div>
           </div>
@@ -294,7 +315,7 @@ export default function PhotosPage() {
               <Clock className="h-5 w-5 text-orange-600 dark:text-orange-400" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-foreground">12</div>
+              <div className="text-2xl font-bold text-foreground">{photoStats.afterPhotos}</div>
               <div className="text-sm text-muted-foreground">After Photos</div>
             </div>
           </div>
@@ -311,41 +332,51 @@ export default function PhotosPage() {
         </div>
 
         <div className="divide-y divide-border">
-          {appointments.map((appointment) => (
-            <button
-              key={appointment.id}
-              onClick={() => setSelectedAppointment(appointment)}
-              className="w-full p-6 text-left hover:bg-accent transition-colors"
-            >
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <h4 className="font-medium text-foreground">
-                      {appointment.customers?.name}
-                    </h4>
-                    <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(appointment.status)}`}>
-                      {appointment.status.replace('_', ' ')}
-                    </span>
+          {appointments.length === 0 ? (
+            <div className="p-8 text-center">
+              <Camera className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No appointments found</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Appointments will appear here once you have completed jobs
+              </p>
+            </div>
+          ) : (
+            appointments.map((appointment) => (
+              <button
+                key={appointment.id}
+                onClick={() => setSelectedAppointment(appointment)}
+                className="w-full p-6 text-left hover:bg-accent transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <h4 className="font-medium text-foreground">
+                        {appointment.customers?.name || 'Unknown Customer'}
+                      </h4>
+                      <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(appointment.status)}`}>
+                        {appointment.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-4 w-4" />
+                        {formatDate(appointment.scheduled_date)}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        {formatTime(appointment.scheduled_time)}
+                      </span>
+                      <span>{appointment.service_type}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-4 w-4" />
-                      {formatDate(appointment.scheduled_date)}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      {formatTime(appointment.scheduled_time)}
-                    </span>
-                    <span>{appointment.service_type}</span>
+                  <div className="flex items-center gap-2">
+                    <Camera className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Manage Photos</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Camera className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Manage Photos</span>
-                </div>
-              </div>
-            </button>
-          ))}
+              </button>
+            ))
+          )}
         </div>
       </div>
     </div>
