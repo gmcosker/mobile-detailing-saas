@@ -24,7 +24,6 @@ export default function PaymentsPage() {
   const [payments, setPayments] = useState<any[]>([])
   const [appointments, setAppointments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [showInvoiceForm, setShowInvoiceForm] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -135,7 +134,6 @@ export default function PaymentsPage() {
   const handleInvoiceSent = (invoiceUrl: string) => {
     console.log('Invoice sent:', invoiceUrl)
     // In a real app, you might want to update the appointment status
-    setShowInvoiceForm(false)
     setSelectedAppointment(null)
   }
 
@@ -177,20 +175,11 @@ export default function PaymentsPage() {
   return (
     <div className="p-4 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">Payments</h2>
-          <p className="text-muted-foreground">
-            Manage invoices, track payments, and monitor earnings
-          </p>
-        </div>
-        <Button 
-          onClick={() => setShowInvoiceForm(true)}
-          className="gap-2"
-        >
-          <Send className="h-4 w-4" />
-          Send Invoice
-        </Button>
+      <div>
+        <h2 className="text-2xl font-bold text-foreground">Payments</h2>
+        <p className="text-muted-foreground">
+          Manage invoices, track payments, and monitor earnings
+        </p>
       </div>
 
       {/* Stats Cards */}
