@@ -127,24 +127,38 @@ export async function POST(
     let branding
     if (existingBranding) {
       // Update existing branding
+      console.log('[BRANDING API] Updating existing branding with:', updates)
       const updated = await brandingService.update(detailerId, updates)
       if (!updated) {
+        console.error('[BRANDING API] Failed to update branding')
         return NextResponse.json(
           { success: false, error: 'Failed to update branding' },
           { status: 500 }
         )
       }
       branding = await brandingService.getByDetailerId(detailerId)
+      console.log('[BRANDING API] Branding updated successfully:', branding)
     } else {
       // Create new branding
+      console.log('[BRANDING API] Creating new branding with:', updates)
       const created = await brandingService.create(detailerId, updates)
       if (!created) {
+        console.error('[BRANDING API] Failed to create branding')
         return NextResponse.json(
           { success: false, error: 'Failed to create branding' },
           { status: 500 }
         )
       }
       branding = await brandingService.getByDetailerId(detailerId)
+      console.log('[BRANDING API] Branding created successfully:', branding)
+    }
+
+    if (!branding) {
+      console.error('[BRANDING API] Branding not found after save operation')
+      return NextResponse.json(
+        { success: false, error: 'Branding saved but could not be retrieved' },
+        { status: 500 }
+      )
     }
 
     return NextResponse.json({

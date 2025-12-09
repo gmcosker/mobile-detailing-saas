@@ -473,10 +473,22 @@ export const brandingService = {
     const supabase = getSupabaseClient()
     if (!supabase) return false
     
+    // First get the detailer's UUID (same as update function)
+    const { data: detailer, error: detailerError } = await supabase
+      .from('detailers')
+      .select('id')
+      .eq('detailer_id', detailerId)
+      .single()
+    
+    if (detailerError || !detailer) {
+      console.error('Error finding detailer:', detailerError)
+      return false
+    }
+    
     const { error } = await supabase
       .from('branding')
       .insert({
-        detailer_id: detailerId,
+        detailer_id: detailer.id, // Use UUID, not the string detailerId
         ...branding
       })
     
