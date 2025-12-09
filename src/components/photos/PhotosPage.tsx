@@ -24,12 +24,7 @@ export default function PhotosPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
-  const [photoStats, setPhotoStats] = useState({
-    totalPhotos: 0,
-    documentedJobs: 0,
-    beforePhotos: 0,
-    afterPhotos: 0
-  })
+  const [appointmentPhotoCounts, setAppointmentPhotoCounts] = useState<Record<string, { before: number; after: number }>>({})
 
   useEffect(() => {
     // Fetch appointments from API (filtered by authenticated user)
@@ -57,9 +52,9 @@ export default function PhotosPage() {
           console.log('Fetched appointments:', data.appointments.length)
           setAppointments(data.appointments)
           
-          // Calculate photo stats from appointments (async, don't block)
-          calculatePhotoStats(data.appointments).catch(err => {
-            console.error('Error calculating photo stats:', err)
+          // Fetch photo counts for each appointment
+          fetchPhotoCountsForAppointments(data.appointments, token).catch(err => {
+            console.error('Error fetching photo counts:', err)
           })
         } else {
           console.error('Failed to fetch appointments:', data.error)
@@ -76,52 +71,39 @@ export default function PhotosPage() {
     fetchAppointments()
   }, [])
 
-  const calculatePhotoStats = async (appointments: Appointment[]) => {
-    try {
-      const token = localStorage.getItem('auth_token')
-      if (!token) return
+  const fetchPhotoCountsForAppointments = async (appointments: Appointment[], token: string) => {
+    const counts: Record<string, { before: number; after: number }> = {}
 
-      let totalPhotos = 0
-      let documentedJobs = 0
-      let beforePhotos = 0
-      let afterPhotos = 0
-
-      // Count appointments with photos
-      for (const appointment of appointments) {
-        try {
-          const photoResponse = await fetch(`/api/photos/appointment/${appointment.id}`, {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          })
-
-          if (photoResponse.ok) {
-            const photoData = await photoResponse.json()
-            if (photoData.success && photoData.photos) {
-              const photos = photoData.photos
-              if (photos.length > 0) {
-                documentedJobs++
-                totalPhotos += photos.length
-                beforePhotos += photos.filter((p: any) => p.photo_type === 'before').length
-                afterPhotos += photos.filter((p: any) => p.photo_type === 'after').length
-              }
-            }
+    // Fetch photo counts for each appointment
+    for (const appointment of appointments) {
+      try {
+        const photoResponse = await fetch(`/api/photos/appointment/${appointment.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
           }
-        } catch (error) {
-          // Skip if photo fetch fails for this appointment
-          console.warn(`Failed to fetch photos for appointment ${appointment.id}:`, error)
-        }
-      }
+        })
 
-      setPhotoStats({
-        totalPhotos,
-        documentedJobs,
-        beforePhotos,
-        afterPhotos
-      })
-    } catch (error) {
-      console.error('Error calculating photo stats:', error)
+        if (photoResponse.ok) {
+          const photoData = await photoResponse.json()
+          if (photoData.success && photoData.photos) {
+            const photos = photoData.photos as Array<{ photo_type: string }>
+            const beforeCount = photos.filter(p => p.photo_type === 'before').length
+            const afterCount = photos.filter(p => p.photo_type === 'after').length
+            counts[appointment.id] = { before: beforeCount, after: afterCount }
+          } else {
+            counts[appointment.id] = { before: 0, after: 0 }
+          }
+        } else {
+          counts[appointment.id] = { before: 0, after: 0 }
+        }
+      } catch (error) {
+        // Default to 0 if fetch fails
+        console.warn(`Failed to fetch photos for appointment ${appointment.id}:`, error)
+        counts[appointment.id] = { before: 0, after: 0 }
+      }
     }
+
+    setAppointmentPhotoCounts(counts)
   }
 
   // Force refresh photos when navigating back to this page
@@ -137,8 +119,13 @@ export default function PhotosPage() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [selectedAppointment])
 
-  const handleBackToList = () => {
+  const handleBackToList = async () => {
     setSelectedAppointment(null)
+    // Refresh photo counts when returning to list
+    const token = localStorage.getItem('auth_token')
+    if (token && appointments.length > 0) {
+      await fetchPhotoCountsForAppointments(appointments, token)
+    }
   }
 
   const formatDate = (date: string): string => {
@@ -271,57 +258,6 @@ export default function PhotosPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-50 dark:bg-blue-950 p-2 rounded-lg">
-              <Camera className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-foreground">{photoStats.totalPhotos}</div>
-              <div className="text-sm text-muted-foreground">Total Photos</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-green-50 dark:bg-green-950 p-2 rounded-lg">
-              <Calendar className="h-5 w-5 text-green-600 dark:text-green-400" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-foreground">{photoStats.documentedJobs}</div>
-              <div className="text-sm text-muted-foreground">Documented Jobs</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-purple-50 dark:bg-purple-950 p-2 rounded-lg">
-              <User className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-foreground">{photoStats.beforePhotos}</div>
-              <div className="text-sm text-muted-foreground">Before Photos</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-card border border-border rounded-lg p-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-orange-50 dark:bg-orange-950 p-2 rounded-lg">
-              <Clock className="h-5 w-5 text-orange-600 dark:text-orange-400" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-foreground">{photoStats.afterPhotos}</div>
-              <div className="text-sm text-muted-foreground">After Photos</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Recent Appointments */}
       <div className="bg-card border border-border rounded-lg">
         <div className="p-6 border-b border-border">
@@ -369,9 +305,17 @@ export default function PhotosPage() {
                       <span>{appointment.service_type}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Camera className="h-5 w-5 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Manage Photos</span>
+                  <div className="flex items-center gap-4">
+                    <div className="text-sm text-muted-foreground">
+                      {appointmentPhotoCounts[appointment.id]?.before ?? 0} before photos
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {appointmentPhotoCounts[appointment.id]?.after ?? 0} after photos
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Camera className="h-5 w-5 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Manage Photos</span>
+                    </div>
                   </div>
                 </div>
               </button>
