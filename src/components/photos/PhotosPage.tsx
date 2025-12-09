@@ -71,6 +71,18 @@ export default function PhotosPage() {
     fetchAppointments()
   }, [])
 
+  // Refresh photo counts when returning from photo management
+  useEffect(() => {
+    if (appointments.length > 0 && !selectedAppointment) {
+      const token = localStorage.getItem('auth_token')
+      if (token) {
+        fetchPhotoCountsForAppointments(appointments, token).catch(err => {
+          console.error('Error refreshing photo counts:', err)
+        })
+      }
+    }
+  }, [selectedAppointment, appointments.length])
+
   const fetchPhotoCountsForAppointments = async (appointments: Appointment[], token: string) => {
     const counts: Record<string, { before: number; after: number }> = {}
 
