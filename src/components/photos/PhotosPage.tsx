@@ -317,11 +317,11 @@ export default function PhotosPage() {
                       <span>{appointment.service_type}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-sm text-muted-foreground">
+                  <div className="flex items-center gap-6">
+                    <div className="text-base font-medium text-foreground">
                       {appointmentPhotoCounts[appointment.id]?.before ?? 0} before photos
                     </div>
-                    <div className="text-sm text-muted-foreground">
+                    <div className="text-base font-medium text-foreground">
                       {appointmentPhotoCounts[appointment.id]?.after ?? 0} after photos
                     </div>
                     <div className="flex items-center gap-2">
