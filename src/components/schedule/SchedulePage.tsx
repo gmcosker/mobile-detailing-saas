@@ -17,7 +17,9 @@ import {
   AlertCircle,
   XCircle,
   Loader2,
-  X
+  X,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 
 interface Appointment {
@@ -47,6 +49,19 @@ export default function SchedulePage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('list')
   const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [expandedSections, setExpandedSections] = useState({
+    today: true,
+    tomorrow: true,
+    thisWeek: true,
+    upcoming: true
+  })
+
+  const toggleSection = (section: 'today' | 'tomorrow' | 'thisWeek' | 'upcoming') => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }))
+  }
 
   useEffect(() => {
     fetchAppointments()
@@ -497,105 +512,165 @@ export default function SchedulePage() {
         <>
           {/* Today's Appointments */}
       <div>
-        <h2 className="text-lg font-semibold text-foreground mb-4">Today's Appointments</h2>
-        {todayAppointments.length === 0 ? (
-          <div className="bg-card border border-border rounded-lg p-8 text-center">
-            <p className="text-muted-foreground">No appointments scheduled for today</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {todayAppointments.map((appointment) => (
-              <AppointmentCard 
-                key={appointment.id} 
-                appointment={appointment} 
-                formatTime={formatTime}
-                onConfirm={handleConfirm}
-                isConfirming={confirmingId === appointment.id}
-                onReschedule={handleReschedule}
-                onCancel={handleCancel}
-                onSendReminder={handleSendReminder}
-                onViewDetails={handleViewDetails}
-                onClear={handleClear}
-                actionLoading={actionLoading}
-              />
-            ))}
-          </div>
+        <div 
+          className="flex items-center justify-between mb-4 cursor-pointer"
+          onClick={() => toggleSection('today')}
+        >
+          <h2 className="text-lg font-semibold text-foreground">Today's Appointments</h2>
+          <Button variant="ghost" size="icon" className="h-6 w-6">
+            {expandedSections.today ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+        {expandedSections.today && (
+          <>
+            {todayAppointments.length === 0 ? (
+              <div className="bg-card border border-border rounded-lg p-8 text-center">
+                <p className="text-muted-foreground">No appointments scheduled for today</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {todayAppointments.map((appointment) => (
+                  <AppointmentCard 
+                    key={appointment.id} 
+                    appointment={appointment} 
+                    formatTime={formatTime}
+                    onConfirm={handleConfirm}
+                    isConfirming={confirmingId === appointment.id}
+                    onReschedule={handleReschedule}
+                    onCancel={handleCancel}
+                    onSendReminder={handleSendReminder}
+                    onViewDetails={handleViewDetails}
+                    onClear={handleClear}
+                    actionLoading={actionLoading}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Tomorrow's Appointments */}
       <div>
-        <h2 className="text-lg font-semibold text-foreground mb-4">Tomorrow's Appointments</h2>
-        {tomorrowAppointments.length === 0 ? (
-          <div className="bg-card border border-border rounded-lg p-8 text-center">
-            <p className="text-muted-foreground">No appointments scheduled for tomorrow</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {tomorrowAppointments.map((appointment) => (
-              <AppointmentCard 
-                key={appointment.id} 
-                appointment={appointment} 
-                formatTime={formatTime}
-                onConfirm={handleConfirm}
-                isConfirming={confirmingId === appointment.id}
-                onReschedule={handleReschedule}
-                onCancel={handleCancel}
-                onSendReminder={handleSendReminder}
-                onViewDetails={handleViewDetails}
-                onClear={handleClear}
-                actionLoading={actionLoading}
-              />
-            ))}
-          </div>
+        <div 
+          className="flex items-center justify-between mb-4 cursor-pointer"
+          onClick={() => toggleSection('tomorrow')}
+        >
+          <h2 className="text-lg font-semibold text-foreground">Tomorrow's Appointments</h2>
+          <Button variant="ghost" size="icon" className="h-6 w-6">
+            {expandedSections.tomorrow ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+        {expandedSections.tomorrow && (
+          <>
+            {tomorrowAppointments.length === 0 ? (
+              <div className="bg-card border border-border rounded-lg p-8 text-center">
+                <p className="text-muted-foreground">No appointments scheduled for tomorrow</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {tomorrowAppointments.map((appointment) => (
+                  <AppointmentCard 
+                    key={appointment.id} 
+                    appointment={appointment} 
+                    formatTime={formatTime}
+                    onConfirm={handleConfirm}
+                    isConfirming={confirmingId === appointment.id}
+                    onReschedule={handleReschedule}
+                    onCancel={handleCancel}
+                    onSendReminder={handleSendReminder}
+                    onViewDetails={handleViewDetails}
+                    onClear={handleClear}
+                    actionLoading={actionLoading}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
       {/* This Week's Appointments */}
       {thisWeekAppointments.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold text-foreground mb-4">This Week's Appointments</h2>
-          <div className="space-y-4">
-            {thisWeekAppointments.map((appointment) => (
-              <AppointmentCard 
-                key={appointment.id} 
-                appointment={appointment} 
-                formatTime={formatTime}
-                onConfirm={handleConfirm}
-                isConfirming={confirmingId === appointment.id}
-                onReschedule={handleReschedule}
-                onCancel={handleCancel}
-                onSendReminder={handleSendReminder}
-                onViewDetails={handleViewDetails}
-                onClear={handleClear}
-                actionLoading={actionLoading}
-              />
-            ))}
+          <div 
+            className="flex items-center justify-between mb-4 cursor-pointer"
+            onClick={() => toggleSection('thisWeek')}
+          >
+            <h2 className="text-lg font-semibold text-foreground">This Week's Appointments</h2>
+            <Button variant="ghost" size="icon" className="h-6 w-6">
+              {expandedSections.thisWeek ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </Button>
           </div>
+          {expandedSections.thisWeek && (
+            <div className="space-y-4">
+              {thisWeekAppointments.map((appointment) => (
+                <AppointmentCard 
+                  key={appointment.id} 
+                  appointment={appointment} 
+                  formatTime={formatTime}
+                  onConfirm={handleConfirm}
+                  isConfirming={confirmingId === appointment.id}
+                  onReschedule={handleReschedule}
+                  onCancel={handleCancel}
+                  onSendReminder={handleSendReminder}
+                  onViewDetails={handleViewDetails}
+                  onClear={handleClear}
+                  actionLoading={actionLoading}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* Upcoming Appointments */}
       {upcomingAppointments.length > 0 && (
         <div>
-          <h2 className="text-lg font-semibold text-foreground mb-4">Upcoming Appointments</h2>
-          <div className="space-y-4">
-            {upcomingAppointments.slice(0, 10).map((appointment) => (
-              <AppointmentCard 
-                key={appointment.id} 
-                appointment={appointment} 
-                formatTime={formatTime}
-                onConfirm={handleConfirm}
-                isConfirming={confirmingId === appointment.id}
-                onReschedule={handleReschedule}
-                onCancel={handleCancel}
-                onSendReminder={handleSendReminder}
-                onViewDetails={handleViewDetails}
-                onClear={handleClear}
-                actionLoading={actionLoading}
-              />
-            ))}
+          <div 
+            className="flex items-center justify-between mb-4 cursor-pointer"
+            onClick={() => toggleSection('upcoming')}
+          >
+            <h2 className="text-lg font-semibold text-foreground">Upcoming Appointments</h2>
+            <Button variant="ghost" size="icon" className="h-6 w-6">
+              {expandedSections.upcoming ? (
+                <ChevronUp className="h-4 w-4" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+            </Button>
           </div>
+          {expandedSections.upcoming && (
+            <div className="space-y-4">
+              {upcomingAppointments.slice(0, 10).map((appointment) => (
+                <AppointmentCard 
+                  key={appointment.id} 
+                  appointment={appointment} 
+                  formatTime={formatTime}
+                  onConfirm={handleConfirm}
+                  isConfirming={confirmingId === appointment.id}
+                  onReschedule={handleReschedule}
+                  onCancel={handleCancel}
+                  onSendReminder={handleSendReminder}
+                  onViewDetails={handleViewDetails}
+                  onClear={handleClear}
+                  actionLoading={actionLoading}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
