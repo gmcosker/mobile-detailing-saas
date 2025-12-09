@@ -45,6 +45,8 @@ export default function SchedulePage() {
   const [cancelModal, setCancelModal] = useState<{ open: boolean; appointment: Appointment | null }>({ open: false, appointment: null })
   const [viewDetailsModal, setViewDetailsModal] = useState<{ open: boolean; appointment: Appointment | null }>({ open: false, appointment: null })
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('list')
+  const [currentMonth, setCurrentMonth] = useState(new Date())
 
   useEffect(() => {
     fetchAppointments()
@@ -438,17 +440,43 @@ export default function SchedulePage() {
 
       {/* Calendar View Toggle */}
       <div className="flex gap-2">
-        <Button variant="default" size="sm">
+        <Button 
+          variant={viewMode === 'calendar' ? 'default' : 'outline'} 
+          size="sm"
+          onClick={() => setViewMode('calendar')}
+        >
           <Calendar className="h-4 w-4 mr-2" />
           Calendar View
         </Button>
-        <Button variant="outline" size="sm">
+        <Button 
+          variant={viewMode === 'list' ? 'default' : 'outline'} 
+          size="sm"
+          onClick={() => setViewMode('list')}
+        >
           <Clock className="h-4 w-4 mr-2" />
           List View
         </Button>
       </div>
 
-      {/* Today's Appointments */}
+      {/* Conditional Rendering based on view mode */}
+      {viewMode === 'calendar' ? (
+        <CalendarView 
+          appointments={appointments}
+          currentMonth={currentMonth}
+          onMonthChange={setCurrentMonth}
+          formatTime={formatTime}
+          onConfirm={handleConfirm}
+          confirmingId={confirmingId}
+          onReschedule={handleReschedule}
+          onCancel={handleCancel}
+          onSendReminder={handleSendReminder}
+          onViewDetails={handleViewDetails}
+          onClear={handleClear}
+          actionLoading={actionLoading}
+        />
+      ) : (
+        <>
+          {/* Today's Appointments */}
       <div>
         <h2 className="text-lg font-semibold text-foreground mb-4">Today's Appointments</h2>
         {todayAppointments.length === 0 ? (
@@ -603,7 +631,9 @@ export default function SchedulePage() {
           icon={Calendar}
           color="purple"
         />
-      </div>
+        </div>
+        </>
+      )}
     </div>
   )
 }
@@ -1172,6 +1202,236 @@ function ViewDetailsModal({
             <Button onClick={onClose}>Close</Button>
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Calendar View Component
+function CalendarView({
+  appointments,
+  currentMonth,
+  onMonthChange,
+  formatTime,
+  onConfirm,
+  confirmingId,
+  onReschedule,
+  onCancel,
+  onSendReminder,
+  onViewDetails,
+  onClear,
+  actionLoading
+}: {
+  appointments: Appointment[]
+  currentMonth: Date
+  onMonthChange: (date: Date) => void
+  formatTime: (time: string) => string
+  onConfirm?: (appointmentId: string) => void
+  confirmingId?: string | null
+  onReschedule?: (appointment: Appointment) => void
+  onCancel?: (appointment: Appointment) => void
+  onSendReminder?: (appointmentId: string) => void
+  onViewDetails?: (appointment: Appointment) => void
+  onClear?: (appointmentId: string) => void
+  actionLoading?: string | null
+}) {
+  const normalizeDate = (dateStr: string): string => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return dateStr
+    }
+    if (dateStr.includes('T')) {
+      return dateStr.split('T')[0]
+    }
+    if (dateStr.includes(' ')) {
+      return dateStr.split(' ')[0]
+    }
+    const dateMatch = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/)
+    if (dateMatch) {
+      return dateMatch[0]
+    }
+    const parts = dateStr.split(/[-/]/)
+    if (parts.length >= 3) {
+      const year = parts[0].padStart(4, '0')
+      const month = parts[1].padStart(2, '0')
+      const day = parts[2].padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+    return dateStr
+  }
+
+  // Get first day of month and number of days
+  const year = currentMonth.getFullYear()
+  const month = currentMonth.getMonth()
+  const firstDay = new Date(year, month, 1)
+  const lastDay = new Date(year, month + 1, 0)
+  const daysInMonth = lastDay.getDate()
+  const startingDayOfWeek = firstDay.getDay()
+
+  // Group appointments by date
+  const appointmentsByDate = new Map<string, Appointment[]>()
+  appointments.forEach(apt => {
+    const dateKey = normalizeDate(apt.scheduled_date)
+    if (!appointmentsByDate.has(dateKey)) {
+      appointmentsByDate.set(dateKey, [])
+    }
+    appointmentsByDate.get(dateKey)!.push(apt)
+  })
+
+  // Navigate months
+  const goToPreviousMonth = () => {
+    const newDate = new Date(currentMonth)
+    newDate.setMonth(month - 1)
+    onMonthChange(newDate)
+  }
+
+  const goToNextMonth = () => {
+    const newDate = new Date(currentMonth)
+    newDate.setMonth(month + 1)
+    onMonthChange(newDate)
+  }
+
+  const goToToday = () => {
+    onMonthChange(new Date())
+  }
+
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+  // Check if a date is today
+  const isToday = (day: number) => {
+    const today = new Date()
+    return day === today.getDate() && month === today.getMonth() && year === today.getFullYear()
+  }
+
+  // Get appointments for a specific day
+  const getAppointmentsForDay = (day: number): Appointment[] => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    return appointmentsByDate.get(dateStr) || []
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Month Navigation */}
+      <div className="flex items-center justify-between bg-card border border-border rounded-lg p-4">
+        <Button variant="outline" size="sm" onClick={goToPreviousMonth}>
+          ← Previous
+        </Button>
+        <div className="flex items-center gap-4">
+          <h2 className="text-lg font-semibold text-foreground">
+            {monthNames[month]} {year}
+          </h2>
+          <Button variant="outline" size="sm" onClick={goToToday}>
+            Today
+          </Button>
+        </div>
+        <Button variant="outline" size="sm" onClick={goToNextMonth}>
+          Next →
+        </Button>
+      </div>
+
+      {/* Calendar Grid */}
+      <div className="bg-card border border-border rounded-lg p-4">
+        {/* Day Headers */}
+        <div className="grid grid-cols-7 gap-2 mb-2">
+          {dayNames.map(day => (
+            <div key={day} className="text-center text-sm font-medium text-muted-foreground py-2">
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar Days */}
+        <div className="grid grid-cols-7 gap-2">
+          {/* Empty cells for days before month starts */}
+          {Array.from({ length: startingDayOfWeek }).map((_, i) => (
+            <div key={`empty-${i}`} className="aspect-square" />
+          ))}
+
+          {/* Days of the month */}
+          {Array.from({ length: daysInMonth }).map((_, i) => {
+            const day = i + 1
+            const dayAppointments = getAppointmentsForDay(day)
+            const isTodayDate = isToday(day)
+
+            return (
+              <div
+                key={day}
+                className={`aspect-square border border-border rounded-lg p-2 ${
+                  isTodayDate ? 'bg-primary/10 border-primary' : 'bg-background'
+                }`}
+              >
+                <div className={`text-sm font-medium mb-1 ${isTodayDate ? 'text-primary' : 'text-foreground'}`}>
+                  {day}
+                </div>
+                <div className="space-y-1 overflow-y-auto max-h-[80px]">
+                  {dayAppointments.slice(0, 3).map(apt => (
+                    <div
+                      key={apt.id}
+                      className="text-xs bg-primary/20 text-primary rounded px-1 py-0.5 truncate cursor-pointer hover:bg-primary/30"
+                      onClick={() => onViewDetails?.(apt)}
+                      title={`${apt.customers.name} - ${formatTime(apt.scheduled_time)}`}
+                    >
+                      {formatTime(apt.scheduled_time)} {apt.customers.name.split(' ')[0]}
+                    </div>
+                  ))}
+                  {dayAppointments.length > 3 && (
+                    <div className="text-xs text-muted-foreground">
+                      +{dayAppointments.length - 3} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Selected Day Appointments (if any) */}
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold text-foreground">
+          All Appointments - {monthNames[month]} {year}
+        </h2>
+        {appointments.filter(apt => {
+          const aptDate = normalizeDate(apt.scheduled_date)
+          const aptYear = parseInt(aptDate.split('-')[0])
+          const aptMonth = parseInt(aptDate.split('-')[1])
+          return aptYear === year && aptMonth === month + 1
+        }).length === 0 ? (
+          <div className="bg-card border border-border rounded-lg p-8 text-center">
+            <p className="text-muted-foreground">No appointments scheduled for this month</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {appointments
+              .filter(apt => {
+                const aptDate = normalizeDate(apt.scheduled_date)
+                const aptYear = parseInt(aptDate.split('-')[0])
+                const aptMonth = parseInt(aptDate.split('-')[1])
+                return aptYear === year && aptMonth === month + 1
+              })
+              .sort((a, b) => {
+                const dateA = normalizeDate(a.scheduled_date)
+                const dateB = normalizeDate(b.scheduled_date)
+                if (dateA !== dateB) return dateA.localeCompare(dateB)
+                return a.scheduled_time.localeCompare(b.scheduled_time)
+              })
+              .map((appointment) => (
+                <AppointmentCard 
+                  key={appointment.id} 
+                  appointment={appointment} 
+                  formatTime={formatTime}
+                  onConfirm={onConfirm}
+                  isConfirming={confirmingId === appointment.id}
+                  onReschedule={onReschedule}
+                  onCancel={onCancel}
+                  onSendReminder={onSendReminder}
+                  onViewDetails={onViewDetails}
+                  onClear={onClear}
+                  actionLoading={actionLoading}
+                />
+              ))}
+          </div>
+        )}
       </div>
     </div>
   )
