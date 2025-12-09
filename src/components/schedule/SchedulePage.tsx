@@ -398,9 +398,28 @@ export default function SchedulePage() {
     return aptDate === tomorrow
   })
   
+  // Get date 7 days from today for "This Week" section
+  const getWeekFromNow = (): string => {
+    const weekFromNow = new Date()
+    weekFromNow.setDate(weekFromNow.getDate() + 7)
+    const year = weekFromNow.getFullYear()
+    const month = String(weekFromNow.getMonth() + 1).padStart(2, '0')
+    const day = String(weekFromNow.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  const weekFromNow = getWeekFromNow()
+  
+  // This Week's Appointments (after tomorrow, within 7 days)
+  const thisWeekAppointments = appointments.filter(apt => {
+    const aptDate = normalizeDate(apt.scheduled_date)
+    return aptDate > tomorrow && aptDate <= weekFromNow
+  })
+  
+  // Upcoming Appointments (beyond this week)
   const upcomingAppointments = appointments.filter(apt => {
     const aptDate = normalizeDate(apt.scheduled_date)
-    return aptDate > tomorrow
+    return aptDate > weekFromNow
   })
 
   if (isLoading) {
@@ -531,6 +550,30 @@ export default function SchedulePage() {
           </div>
         )}
       </div>
+
+      {/* This Week's Appointments */}
+      {thisWeekAppointments.length > 0 && (
+        <div>
+          <h2 className="text-lg font-semibold text-foreground mb-4">This Week's Appointments</h2>
+          <div className="space-y-4">
+            {thisWeekAppointments.map((appointment) => (
+              <AppointmentCard 
+                key={appointment.id} 
+                appointment={appointment} 
+                formatTime={formatTime}
+                onConfirm={handleConfirm}
+                isConfirming={confirmingId === appointment.id}
+                onReschedule={handleReschedule}
+                onCancel={handleCancel}
+                onSendReminder={handleSendReminder}
+                onViewDetails={handleViewDetails}
+                onClear={handleClear}
+                actionLoading={actionLoading}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Upcoming Appointments */}
       {upcomingAppointments.length > 0 && (
