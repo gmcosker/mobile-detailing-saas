@@ -77,7 +77,10 @@ export async function POST(
       secondary_color,
       text_color,
       font_family,
-      logo_url
+      logo_url,
+      google_place_id,
+      google_rating,
+      google_review_count
     } = body
 
     // Build update object
@@ -119,6 +122,27 @@ export async function POST(
         )
       }
       updates.logo_url = logo_url
+    }
+    if (google_place_id !== undefined) updates.google_place_id = google_place_id
+    if (google_rating !== undefined) {
+      const rating = parseFloat(google_rating)
+      if (isNaN(rating) || rating < 0 || rating > 5) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid google_rating. Must be a number between 0 and 5' },
+          { status: 400 }
+        )
+      }
+      updates.google_rating = rating.toString()
+    }
+    if (google_review_count !== undefined) {
+      const count = parseInt(google_review_count)
+      if (isNaN(count) || count < 0) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid google_review_count. Must be a positive number' },
+          { status: 400 }
+        )
+      }
+      updates.google_review_count = count
     }
 
     // Check if branding exists

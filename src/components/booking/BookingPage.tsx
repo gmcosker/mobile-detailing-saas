@@ -376,16 +376,25 @@ export default function BookingPage({ detailerId: detailerIdProp }: BookingPageP
                   >
                     {detailer?.business_name || 'Auto Detailing Service'}
                   </h1>
-                  <div className="flex items-center gap-2 mt-1">
-                    <div className="flex items-center gap-1">
-                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                  {branding?.google_rating && branding?.google_review_count && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => {
+                          const rating = parseFloat(branding.google_rating) || 0
+                          const filled = star <= Math.round(rating)
+                          return (
+                            <Star 
+                              key={star}
+                              className={`h-4 w-4 ${filled ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                            />
+                          )
+                        })}
+                      </div>
+                      <span className="text-sm font-semibold text-gray-600">
+                        {branding.google_rating} ({branding.google_review_count} reviews)
+                      </span>
                     </div>
-                    <span className="text-sm font-semibold text-gray-600">4.9 (127 reviews)</span>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>

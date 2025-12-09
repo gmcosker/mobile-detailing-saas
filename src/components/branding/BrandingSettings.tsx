@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Save, Loader2, Eye } from 'lucide-react'
+import { Save, Loader2, Eye, Star, ExternalLink } from 'lucide-react'
 import LogoUpload from './LogoUpload'
 import { brandingService } from '@/lib/database'
 import { getSupabaseClient } from '@/lib/supabase'
@@ -281,6 +281,96 @@ export default function BrandingSettings({ detailerId }: BrandingSettingsProps) 
                 <option value="Lato">Lato (Professional)</option>
                 <option value="Poppins">Poppins (Bold)</option>
               </select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Google Business Integration */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Google Business Reviews</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <Label htmlFor="google_place_id">Google Place ID</Label>
+              <Input
+                id="google_place_id"
+                value={branding?.google_place_id || ''}
+                onChange={(e) => updateBranding('google_place_id', e.target.value)}
+                placeholder="e.g., ChIJN1t_tDeuEmsRUsoyG83frY4"
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Find your Place ID at{' '}
+                <a 
+                  href="https://developers.google.com/maps/documentation/places/web-service/place-id" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  Google Places API
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="google_rating">Rating (0-5)</Label>
+                <Input
+                  id="google_rating"
+                  type="number"
+                  min="0"
+                  max="5"
+                  step="0.1"
+                  value={branding?.google_rating || ''}
+                  onChange={(e) => updateBranding('google_rating', e.target.value)}
+                  placeholder="4.9"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="google_review_count">Review Count</Label>
+                <Input
+                  id="google_review_count"
+                  type="number"
+                  min="0"
+                  value={branding?.google_review_count || ''}
+                  onChange={(e) => updateBranding('google_review_count', e.target.value)}
+                  placeholder="127"
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            {branding?.google_rating && branding?.google_review_count && (
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground mb-2">Preview:</p>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map((star) => {
+                      const rating = parseFloat(branding.google_rating) || 0
+                      const filled = star <= Math.round(rating)
+                      return (
+                        <Star 
+                          key={star}
+                          className={`h-4 w-4 ${filled ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                        />
+                      )
+                    })}
+                  </div>
+                  <span className="text-sm font-semibold">
+                    {branding.google_rating} ({branding.google_review_count} reviews)
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                <strong>Note:</strong> For now, you can manually enter your Google rating and review count. 
+                In the future, we'll add automatic syncing with Google Places API.
+              </p>
             </div>
           </CardContent>
         </Card>
