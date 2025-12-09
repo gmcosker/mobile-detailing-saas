@@ -99,13 +99,18 @@ export default function BrandingSettings({ detailerId }: BrandingSettingsProps) 
   const handleSave = async () => {
     setSaving(true)
     try {
-      const brandingData = {
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        alert('Not authenticated. Please log in again.')
+        setSaving(false)
+        return
+      }
+
+      const brandingData: any = {
         primary_color: branding?.primary_color || '#3B82F6',
         secondary_color: branding?.secondary_color || '#F3F4F6',
         text_color: branding?.text_color || '#1F2937',
-        font_family: branding?.font_family || 'Inter',
-        logo_position: branding?.logo_position || 'header',
-        updated_at: new Date().toISOString()
+        font_family: branding?.font_family || 'Inter'
       }
 
       // Logo should already be uploaded and URL set in state
@@ -114,23 +119,36 @@ export default function BrandingSettings({ detailerId }: BrandingSettingsProps) 
       }
 
       console.log('Saving branding data:', brandingData)
-      const success = await brandingService.update(detailerId, brandingData)
       
-      if (success) {
-        console.log('Branding saved successfully!')
+      // Use API endpoint instead of direct database service
+      const response = await fetch(`/api/branding/${detailerId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(brandingData)
+      })
+
+      const data = await response.json()
+      
+      if (response.ok && data.success) {
+        console.log('Branding saved successfully!', data.branding)
         alert('Branding settings saved!')
-        // Reload the branding data
-        const updatedBranding = await brandingService.getByDetailerId(detailerId)
-        if (updatedBranding) {
-          setBranding(updatedBranding)
+        // Update state with the returned branding data
+        if (data.branding) {
+          setBranding(data.branding)
+        } else {
+          // Reload if not returned
+          await loadBranding()
         }
       } else {
-        console.error('Failed to save branding')
-        alert('Failed to save branding settings')
+        console.error('Failed to save branding:', data.error)
+        alert(data.error || 'Failed to save branding settings')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving branding:', error)
-      alert(`Error saving branding settings: ${error.message}`)
+      alert(`Error saving branding settings: ${error.message || 'Unknown error'}`)
     } finally {
       setSaving(false)
     }
