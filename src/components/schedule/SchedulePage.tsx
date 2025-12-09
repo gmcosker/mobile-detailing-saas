@@ -46,6 +46,7 @@ export default function SchedulePage() {
   const [rescheduleModal, setRescheduleModal] = useState<{ open: boolean; appointment: Appointment | null }>({ open: false, appointment: null })
   const [cancelModal, setCancelModal] = useState<{ open: boolean; appointment: Appointment | null }>({ open: false, appointment: null })
   const [viewDetailsModal, setViewDetailsModal] = useState<{ open: boolean; appointment: Appointment | null }>({ open: false, appointment: null })
+  const [newAppointmentModal, setNewAppointmentModal] = useState<{ open: boolean }>({ open: false })
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('list')
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -55,6 +56,7 @@ export default function SchedulePage() {
     thisWeek: true,
     upcoming: true
   })
+  const [detailerId, setDetailerId] = useState<string>('')
 
   const toggleSection = (section: 'today' | 'tomorrow' | 'thisWeek' | 'upcoming') => {
     setExpandedSections(prev => ({
@@ -65,7 +67,29 @@ export default function SchedulePage() {
 
   useEffect(() => {
     fetchAppointments()
+    fetchDetailerId()
   }, [])
+
+  const fetchDetailerId = async () => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      if (!token) return
+
+      const response = await fetch('/api/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      const data = await response.json()
+      if (data.success && data.user?.detailer_id) {
+        setDetailerId(data.user.detailer_id)
+      }
+    } catch (err) {
+      console.error('Error fetching detailer ID:', err)
+    }
+  }
 
   const fetchAppointments = async () => {
     setIsLoading(true)
@@ -466,7 +490,10 @@ export default function SchedulePage() {
           <h1 className="text-2xl font-bold text-foreground">Schedule</h1>
           <p className="text-muted-foreground">Manage your appointments and availability</p>
         </div>
-        <Button className="w-full sm:w-auto">
+        <Button 
+          className="w-full sm:w-auto"
+          onClick={() => setNewAppointmentModal({ open: true })}
+        >
           <Plus className="h-4 w-4 mr-2" />
           New Appointment
         </Button>
@@ -700,6 +727,17 @@ export default function SchedulePage() {
           appointment={viewDetailsModal.appointment}
           formatTime={formatTime}
           onClose={() => setViewDetailsModal({ open: false, appointment: null })}
+        />
+      )}
+
+      {newAppointmentModal.open && (
+        <NewAppointmentModal
+          detailerId={detailerId}
+          onClose={() => setNewAppointmentModal({ open: false })}
+          onSuccess={() => {
+            setNewAppointmentModal({ open: false })
+            fetchAppointments()
+          }}
         />
       )}
 
@@ -1550,6 +1588,462 @@ function CalendarView({
               ))}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// New Appointment Modal
+function NewAppointmentModal({
+  detailerId,
+  onClose,
+  onSuccess
+}: {
+  detailerId: string
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const [customers, setCustomers] = useState<Array<{ id: string; name: string; phone: string; email: string | null }>>([])
+  const [services, setServices] = useState<Array<{ id: string; name: string; price: number }>>([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  const [formData, setFormData] = useState({
+    customer_id: '',
+    customer_name: '',
+    customer_phone: '',
+    customer_email: '',
+    customer_address: '',
+    service_id: '',
+    service_name: '',
+    service_price: '',
+    scheduled_date: '',
+    scheduled_time: '',
+    total_amount: '',
+    notes: ''
+  })
+
+  const [createNewCustomer, setCreateNewCustomer] = useState(false)
+
+  useEffect(() => {
+    if (detailerId) {
+      fetchCustomers()
+      fetchServices()
+    }
+  }, [detailerId])
+
+  const fetchCustomers = async () => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      if (!token) return
+
+      const response = await fetch('/api/customers', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      const data = await response.json()
+      if (data.success && data.customers) {
+        setCustomers(data.customers)
+      }
+    } catch (err) {
+      console.error('Error fetching customers:', err)
+    }
+  }
+
+  const fetchServices = async () => {
+    try {
+      const token = localStorage.getItem('auth_token')
+      if (!token) return
+
+      const response = await fetch('/api/services?activeOnly=true', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      const data = await response.json()
+      if (data.success && data.services) {
+        setServices(data.services)
+      }
+    } catch (err) {
+      console.error('Error fetching services:', err)
+    }
+  }
+
+  const handleCustomerChange = (customerId: string) => {
+    const customer = customers.find(c => c.id === customerId)
+    if (customer) {
+      setFormData(prev => ({
+        ...prev,
+        customer_id: customerId,
+        customer_name: customer.name,
+        customer_phone: customer.phone,
+        customer_email: customer.email || ''
+      }))
+      setCreateNewCustomer(false)
+    }
+  }
+
+  const handleServiceChange = (serviceId: string) => {
+    const service = services.find(s => s.id === serviceId)
+    if (service) {
+      setFormData(prev => ({
+        ...prev,
+        service_id: serviceId,
+        service_name: service.name,
+        service_price: service.price.toString()
+      }))
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+
+    try {
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        alert('Not authenticated. Please log in again.')
+        return
+      }
+
+      let customerId = formData.customer_id
+
+      // If creating a new customer
+      if (createNewCustomer || !customerId) {
+        if (!formData.customer_name || !formData.customer_phone) {
+          alert('Customer name and phone are required')
+          setIsSubmitting(false)
+          return
+        }
+
+        // Create customer
+        const customerResponse = await fetch('/api/customers', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            name: formData.customer_name,
+            phone: formData.customer_phone,
+            email: formData.customer_email || null,
+            address: formData.customer_address || null
+          })
+        })
+
+        const customerData = await customerResponse.json()
+        if (!customerResponse.ok || !customerData.success) {
+          throw new Error(customerData.error || 'Failed to create customer')
+        }
+
+        customerId = customerData.customer.id
+      }
+
+      // Validate required fields
+      if (!formData.scheduled_date || !formData.scheduled_time) {
+        alert('Date and time are required')
+        setIsSubmitting(false)
+        return
+      }
+
+      // Validate date is in future
+      const appointmentDate = new Date(`${formData.scheduled_date}T${formData.scheduled_time}`)
+      const now = new Date()
+      if (appointmentDate <= now) {
+        alert('Appointment date and time must be in the future')
+        setIsSubmitting(false)
+        return
+      }
+
+      // Get service name
+      let serviceType = formData.service_name
+      if (!serviceType && formData.service_id) {
+        const service = services.find(s => s.id === formData.service_id)
+        serviceType = service?.name || 'Custom Service'
+      }
+      if (!serviceType) {
+        serviceType = 'Custom Service'
+      }
+
+      // Get amount
+      let totalAmount: number | null = null
+      if (formData.total_amount) {
+        totalAmount = parseFloat(formData.total_amount)
+        if (isNaN(totalAmount) || totalAmount < 0) {
+          alert('Invalid amount')
+          setIsSubmitting(false)
+          return
+        }
+      } else if (formData.service_price) {
+        totalAmount = parseFloat(formData.service_price)
+      }
+
+      // Get detailer UUID
+      const userResponse = await fetch('/api/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      const userData = await userResponse.json()
+      if (!userData.success || !userData.user?.detailer_id) {
+        throw new Error('Failed to get detailer information')
+      }
+
+      // Create appointment
+      const appointmentResponse = await fetch('/api/appointments', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          detailer_id: userData.user.detailer_id,
+          customer_id: customerId,
+          scheduled_date: formData.scheduled_date,
+          scheduled_time: formData.scheduled_time.includes(':') && formData.scheduled_time.split(':').length === 2 
+            ? `${formData.scheduled_time}:00` 
+            : formData.scheduled_time,
+          service_type: serviceType,
+          total_amount: totalAmount,
+          notes: formData.notes || null
+        })
+      })
+
+      const appointmentData = await appointmentResponse.json()
+      if (!appointmentResponse.ok || !appointmentData.success) {
+        throw new Error(appointmentData.error || 'Failed to create appointment')
+      }
+
+      alert('Appointment created successfully!')
+      onSuccess()
+    } catch (err: any) {
+      console.error('Error creating appointment:', err)
+      alert(err.message || 'Failed to create appointment. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Get today's date in YYYY-MM-DD format
+  const getTodayDate = () => {
+    const today = new Date()
+    const year = today.getFullYear()
+    const month = String(today.getMonth() + 1).padStart(2, '0')
+    const day = String(today.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-card border border-border rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold text-foreground">New Appointment</h2>
+            <Button variant="ghost" size="icon" onClick={onClose} disabled={isSubmitting}>
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Customer Selection */}
+            <div>
+              <Label htmlFor="customer-select" className="mb-2 block">Customer *</Label>
+              <div className="flex gap-2 mb-2">
+                <Button
+                  type="button"
+                  variant={!createNewCustomer ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setCreateNewCustomer(false)}
+                >
+                  Select Existing
+                </Button>
+                <Button
+                  type="button"
+                  variant={createNewCustomer ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => {
+                    setCreateNewCustomer(true)
+                    setFormData(prev => ({ ...prev, customer_id: '' }))
+                  }}
+                >
+                  Create New
+                </Button>
+              </div>
+
+              {!createNewCustomer ? (
+                <select
+                  id="customer-select"
+                  value={formData.customer_id}
+                  onChange={(e) => handleCustomerChange(e.target.value)}
+                  className="w-full p-2 border border-input bg-background rounded-md"
+                  required={!createNewCustomer}
+                >
+                  <option value="">Select a customer...</option>
+                  {customers.map(customer => (
+                    <option key={customer.id} value={customer.id}>
+                      {customer.name} - {customer.phone}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="customer_name">Name *</Label>
+                    <Input
+                      id="customer_name"
+                      value={formData.customer_name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, customer_name: e.target.value }))}
+                      required={createNewCustomer}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="customer_phone">Phone *</Label>
+                    <Input
+                      id="customer_phone"
+                      type="tel"
+                      value={formData.customer_phone}
+                      onChange={(e) => setFormData(prev => ({ ...prev, customer_phone: e.target.value }))}
+                      required={createNewCustomer}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="customer_email">Email</Label>
+                    <Input
+                      id="customer_email"
+                      type="email"
+                      value={formData.customer_email}
+                      onChange={(e) => setFormData(prev => ({ ...prev, customer_email: e.target.value }))}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="customer_address">Address</Label>
+                    <Input
+                      id="customer_address"
+                      value={formData.customer_address}
+                      onChange={(e) => setFormData(prev => ({ ...prev, customer_address: e.target.value }))}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Service Selection */}
+            <div>
+              <Label htmlFor="service-select" className="mb-2 block">Service *</Label>
+              <select
+                id="service-select"
+                value={formData.service_id}
+                onChange={(e) => handleServiceChange(e.target.value)}
+                className="w-full p-2 border border-input bg-background rounded-md"
+              >
+                <option value="">Select a service or enter custom...</option>
+                {services.map(service => (
+                  <option key={service.id} value={service.id}>
+                    {service.name} - ${service.price.toFixed(2)}
+                  </option>
+                ))}
+              </select>
+              {!formData.service_id && (
+                <div className="mt-2">
+                  <Label htmlFor="service_name">Custom Service Name</Label>
+                  <Input
+                    id="service_name"
+                    value={formData.service_name}
+                    onChange={(e) => setFormData(prev => ({ ...prev, service_name: e.target.value }))}
+                    placeholder="Enter service name"
+                    className="mt-1"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Date and Time */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="scheduled_date">Date *</Label>
+                <Input
+                  id="scheduled_date"
+                  type="date"
+                  value={formData.scheduled_date}
+                  onChange={(e) => setFormData(prev => ({ ...prev, scheduled_date: e.target.value }))}
+                  min={getTodayDate()}
+                  required
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="scheduled_time">Time *</Label>
+                <Input
+                  id="scheduled_time"
+                  type="time"
+                  value={formData.scheduled_time}
+                  onChange={(e) => setFormData(prev => ({ ...prev, scheduled_time: e.target.value }))}
+                  required
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            {/* Amount */}
+            <div>
+              <Label htmlFor="total_amount">Amount</Label>
+              <Input
+                id="total_amount"
+                type="number"
+                step="0.01"
+                min="0"
+                value={formData.total_amount}
+                onChange={(e) => setFormData(prev => ({ ...prev, total_amount: e.target.value }))}
+                placeholder={formData.service_price ? `Default: $${formData.service_price}` : 'Enter amount'}
+                className="mt-1"
+              />
+              {formData.service_price && !formData.total_amount && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Will use service price: ${formData.service_price}
+                </p>
+              )}
+            </div>
+
+            {/* Notes */}
+            <div>
+              <Label htmlFor="notes">Notes</Label>
+              <textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Additional notes about this appointment..."
+                className="w-full mt-1 p-3 border border-input bg-background rounded-md text-sm min-h-[80px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
+
+            {/* Submit Buttons */}
+            <div className="flex gap-2 justify-end pt-4">
+              <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Appointment'
+                )}
+              </Button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   )
