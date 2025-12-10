@@ -1016,21 +1016,28 @@ function CustomerDetailModal({ customer, detailerId, onClose, onCustomerUpdated 
                 <span className="text-muted-foreground">Total Spent: </span>
                 <span className="text-foreground font-medium">${customer.totalSpent.toFixed(2)}</span>
               </div>
-              {customer.last_booking_invite_sent_at && (
-                <div className="text-sm sm:col-span-2 flex items-center gap-2 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-2">
-                  <MessageSquare className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                  <span className="text-muted-foreground">Last booking invite sent: </span>
-                  <span className="text-blue-700 dark:text-blue-300 font-semibold">
-                    {new Date(customer.last_booking_invite_sent_at).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit'
-                    })}
-                  </span>
+            </div>
+            
+            {/* Last Booking Invite Sent - Prominent Display */}
+            {customer.last_booking_invite_sent_at ? (
+              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                  <div>
+                    <span className="text-sm font-semibold text-blue-900 dark:text-blue-100">Last Booking Invite Sent</span>
+                    <div className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+                      {new Date(customer.last_booking_invite_sent_at).toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit'
+                      })}
+                    </div>
+                  </div>
                 </div>
-              )}
+              </div>
+            ) : null}
             </div>
           </div>
 
