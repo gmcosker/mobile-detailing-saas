@@ -23,18 +23,25 @@ export default function InstallPrompt() {
       return
     }
 
-    // Detect mobile device (phones and tablets)
+    // Strict mobile device detection - only phones and tablets
     const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera
-    const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase())
-    // Also check for touch capability and screen size as additional indicators
-    const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0
-    const isSmallScreen = window.innerWidth <= 768
+    const ua = userAgent.toLowerCase()
     
-    const isMobileUser = isMobileDevice || (hasTouchScreen && isSmallScreen)
+    // Check for mobile device strings (strict matching)
+    const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(ua)
+    
+    // Additional check: exclude desktop browsers even if they have touch
+    // Desktop Chrome/Firefox/Safari on touchscreen laptops should not trigger
+    const isDesktopBrowser = /windows|macintosh|linux/i.test(ua) && !/android|iphone|ipad|ipod/i.test(ua)
+    
+    // Only show on actual mobile devices, not desktop browsers
+    const isMobileUser = isMobileDevice && !isDesktopBrowser
+    
     setIsMobile(isMobileUser)
 
-    // Don't show prompt on desktop
+    // Don't show prompt on desktop - exit early
     if (!isMobileUser) {
+      console.log('[InstallPrompt] Desktop detected, not showing install prompt')
       return
     }
 
@@ -105,7 +112,15 @@ export default function InstallPrompt() {
   }
 
   // Don't show if already installed, not on mobile, or prompt not ready
+  // Double-check mobile status before rendering
   if (isStandalone || !isMobile || !showPrompt) {
+    return null
+  }
+
+  // Final safety check: verify we're actually on mobile before rendering
+  const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent.toLowerCase() : ''
+  const isDesktopBrowser = /windows|macintosh|linux/i.test(userAgent) && !/android|iphone|ipad|ipod/i.test(userAgent)
+  if (isDesktopBrowser) {
     return null
   }
 
