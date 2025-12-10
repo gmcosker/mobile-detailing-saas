@@ -22,10 +22,12 @@ export default function TrialBanner({ detailerId, onDismiss }: TrialBannerProps)
   useEffect(() => {
     const fetchSubscription = async () => {
       try {
+        console.log('[TrialBanner] Fetching subscription for detailerId:', detailerId)
         const sub = await checkSubscriptionStatus(detailerId)
+        console.log('[TrialBanner] Subscription status:', sub)
         setSubscription(sub)
       } catch (error) {
-        console.error('Error fetching subscription:', error)
+        console.error('[TrialBanner] Error fetching subscription:', error)
       } finally {
         setIsLoading(false)
       }
@@ -33,6 +35,9 @@ export default function TrialBanner({ detailerId, onDismiss }: TrialBannerProps)
 
     if (detailerId) {
       fetchSubscription()
+    } else {
+      console.warn('[TrialBanner] No detailerId provided')
+      setIsLoading(false)
     }
   }, [detailerId])
 

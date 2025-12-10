@@ -58,6 +58,23 @@ export async function checkSubscriptionStatus(detailerId: string): Promise<Subsc
 
   if (error || !detailer) {
     console.error('Error fetching subscription status:', error)
+    // If columns don't exist, treat as expired (migration not run)
+    if (error?.code === '42703' || error?.message?.includes('column')) {
+      console.error('Subscription columns missing - migration not run!')
+    }
+    return {
+      status: 'expired',
+      daysLeft: null,
+      trialEndsAt: null,
+      subscriptionEndsAt: null,
+      subscriptionPlan: null
+    }
+  }
+
+  // Handle accounts created before migration (no trial dates)
+  if (!detailer.trial_ends_at && !detailer.subscription_status) {
+    console.warn('Account has no trial dates - created before migration')
+    // Treat as expired if no trial dates exist
     return {
       status: 'expired',
       daysLeft: null,

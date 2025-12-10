@@ -10,6 +10,15 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export default function InstallPrompt() {
+  // IMMEDIATE desktop check - don't even set up state if desktop
+  if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
+    const userAgent = navigator.userAgent.toLowerCase()
+    const isDesktopOS = /windows|macintosh|linux/i.test(userAgent) && !/android|iphone|ipad|ipod/i.test(userAgent)
+    if (isDesktopOS) {
+      return null // Don't render anything on desktop
+    }
+  }
+
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [showPrompt, setShowPrompt] = useState(false)
   const [isIOS, setIsIOS] = useState(false)
@@ -17,13 +26,10 @@ export default function InstallPrompt() {
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
-    // IMMEDIATE desktop check - exit completely if desktop
+    // Double-check desktop (shouldn't reach here, but safety)
     const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent.toLowerCase() : ''
     const isDesktopOS = /windows|macintosh|linux/i.test(userAgent) && !/android|iphone|ipad|ipod/i.test(userAgent)
-    
-    // If desktop OS, don't do anything at all
     if (isDesktopOS) {
-      console.log('[InstallPrompt] Desktop OS detected, component disabled')
       return
     }
 
