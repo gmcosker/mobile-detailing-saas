@@ -29,7 +29,7 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
     switch (title.toLowerCase()) {
       case 'dashboard':
       case 'schedule':
-        return '/'
+        return '/dashboard'
       case 'customers':
         return '/customers'
       case 'services':
@@ -45,7 +45,7 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
       case 'branding':
         return '/branding'
       default:
-        return '/'
+        return '/dashboard'
     }
   }
 
@@ -117,7 +117,7 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
           </h2>
           
           <nav className="space-y-2">
-            <SidebarButton icon={Calendar} label="Schedule" href="/" active={activePage === '/'} />
+            <SidebarButton icon={Calendar} label="Schedule" href="/dashboard" active={activePage === '/dashboard'} />
             <SidebarButton icon={Users} label="Customers" href="/customers" active={activePage === '/customers'} />
             <SidebarButton icon={Tag} label="Services" href="/services" active={activePage === '/services'} />
             <SidebarButton icon={Camera} label="Photos" href="/photos" active={activePage === '/photos'} />
@@ -149,7 +149,7 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
       {/* Mobile Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border md:hidden z-50">
         <div className="grid grid-cols-5 gap-1 p-2">
-          <NavButton icon={Calendar} label="Schedule" href="/" active={activePage === '/'} />
+          <NavButton icon={Calendar} label="Schedule" href="/dashboard" active={activePage === '/dashboard'} />
           <NavButton icon={Users} label="Customers" href="/customers" active={activePage === '/customers'} />
           <NavButton icon={Camera} label="Photos" href="/photos" active={activePage === '/photos'} />
           <NavButton icon={DollarSign} label="Payments" href="/payments" active={activePage === '/payments'} />

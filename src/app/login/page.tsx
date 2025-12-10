@@ -44,8 +44,8 @@ export default function LoginPage() {
         localStorage.setItem('auth_token', data.token)
       }
 
-      // Redirect to homepage
-      router.push('/')
+      // Redirect to dashboard
+      router.push('/dashboard')
     } catch (err) {
       console.error('Login error:', err)
       setError('An error occurred. Please try again.')
@@ -86,8 +86,8 @@ export default function LoginPage() {
         localStorage.setItem('auth_token', data.token)
       }
 
-      // Redirect to homepage
-      router.push('/')
+      // Redirect to dashboard
+      router.push('/dashboard')
     } catch (err) {
       console.error('Signup error:', err)
       setError('An error occurred. Please try again.')
