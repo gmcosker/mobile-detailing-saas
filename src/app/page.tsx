@@ -1,15 +1,71 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import SelfHostedVideo from '@/components/home/SelfHostedVideo'
 
 export default function HomePage() {
+  const router = useRouter()
   const [showModal, setShowModal] = useState(false)
   const [email, setEmail] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalState, setModalState] = useState<'form' | 'success' | 'error'>('form')
   const [errorMessage, setErrorMessage] = useState('')
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+
+  // Check if PWA and handle authentication redirect
+  useEffect(() => {
+    const checkAuthAndRedirect = async () => {
+      // Check if running in PWA mode (standalone)
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      const isPWA = isStandalone || (window.navigator as any).standalone === true
+
+      if (isPWA) {
+        // Check if user is logged in
+        const token = localStorage.getItem('auth_token')
+        
+        if (token) {
+          // Verify token is still valid
+          try {
+            const response = await fetch('/api/auth/me', {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            })
+            
+            const data = await response.json()
+            
+            if (data.success && data.user) {
+              // User is logged in, redirect to dashboard
+              router.replace('/dashboard')
+              return
+            } else {
+              // Token invalid, clear it and go to login
+              localStorage.removeItem('auth_token')
+              router.replace('/login')
+              return
+            }
+          } catch (error) {
+            // Error checking auth, go to login
+            localStorage.removeItem('auth_token')
+            router.replace('/login')
+            return
+          }
+        } else {
+          // No token, redirect to login
+          router.replace('/login')
+          return
+        }
+      }
+      
+      // Not PWA mode, show landing page
+      setIsCheckingAuth(false)
+    }
+
+    checkAuthAndRedirect()
+  }, [router])
 
   const handleCTAClick = (e: React.MouseEvent, isHeroButton: boolean) => {
     if (isHeroButton) {
@@ -55,6 +111,18 @@ export default function HomePage() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  // Show loading state while checking auth (for PWA)
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-gray-200 flex items-center justify-center" style={{ fontFamily: "'Inter', sans-serif" }}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
