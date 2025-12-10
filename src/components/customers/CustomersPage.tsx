@@ -14,7 +14,9 @@ import {
   Mail,
   MapPin,
   X,
-  Calendar
+  Calendar,
+  MessageSquare,
+  Send
 } from 'lucide-react'
 
 // Helper function to format last service date
@@ -101,6 +103,7 @@ const mockCustomers = [
 
 export default function CustomersPage() {
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false)
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
   const [customers, setCustomers] = useState(mockCustomers)
   const [allCustomers, setAllCustomers] = useState(mockCustomers) // Store all customers for filtering
   const [isLoading, setIsLoading] = useState(false)
@@ -108,6 +111,7 @@ export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterDays, setFilterDays] = useState<string>('all') // 'all', '30', '60', '90', '180', '365'
   const [showFilters, setShowFilters] = useState(false)
+  const [detailerId, setDetailerId] = useState<string>('')
 
   // Fetch customers from API and calculate last service dates
   const fetchCustomers = async () => {
@@ -241,6 +245,33 @@ export default function CustomersPage() {
     setFilterDays(days)
     applyFilters(allCustomers, searchTerm, days)
   }
+
+  // Fetch detailer ID on mount
+  useEffect(() => {
+    const fetchDetailerId = async () => {
+      try {
+        const token = localStorage.getItem('auth_token')
+        if (!token) return
+
+        const response = await fetch('/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.user?.detailer_id) {
+            setDetailerId(data.user.detailer_id)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching detailer ID:', error)
+      }
+    }
+
+    fetchDetailerId()
+  }, [])
 
   // Fetch customers on mount
   useEffect(() => {
@@ -467,7 +498,11 @@ export default function CustomersPage() {
         ) : (
           <div className="divide-y divide-border">
             {customers.map((customer) => (
-              <CustomerRow key={customer.id} customer={customer} />
+              <CustomerRow 
+                key={customer.id} 
+                customer={customer}
+                onClick={() => setSelectedCustomer(customer)}
+              />
             ))}
           </div>
         )}
@@ -480,6 +515,15 @@ export default function CustomersPage() {
           onClose={() => setIsAddCustomerOpen(false)}
           onSave={handleAddCustomer}
           isLoading={isLoading}
+        />
+      )}
+
+      {/* Customer Detail Modal */}
+      {selectedCustomer && (
+        <CustomerDetailModal
+          customer={selectedCustomer}
+          detailerId={detailerId}
+          onClose={() => setSelectedCustomer(null)}
         />
       )}
     </div>
@@ -519,7 +563,7 @@ function StatCard({
   )
 }
 
-function CustomerRow({ customer }: { customer: any }) {
+function CustomerRow({ customer, onClick }: { customer: any; onClick: () => void }) {
   const daysSince = getDaysSinceLastService(customer.lastServiceDate)
   const lastServiceFormatted = formatLastServiceDate(customer.lastServiceDate)
   
@@ -532,7 +576,10 @@ function CustomerRow({ customer }: { customer: any }) {
   }
 
   return (
-    <div className="p-4 sm:p-5 hover:bg-accent/50 transition-colors min-h-[100px] sm:min-h-0">
+    <button
+      onClick={onClick}
+      className="w-full text-left p-4 sm:p-5 hover:bg-accent/50 active:bg-accent transition-colors min-h-[100px] sm:min-h-0"
+    >
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 sm:gap-3 mb-2">
@@ -585,12 +632,12 @@ function CustomerRow({ customer }: { customer: any }) {
             <div className="text-xs sm:text-sm text-muted-foreground">Total Spent</div>
           </div>
           
-          <Button variant="ghost" size="icon" className="h-11 w-11 sm:h-10 sm:w-10 flex-shrink-0">
+          <Button variant="ghost" size="icon" className="h-11 w-11 sm:h-10 sm:w-10 flex-shrink-0" onClick={(e) => { e.stopPropagation(); onClick(); }}>
             <MoreHorizontal className="h-5 w-5 sm:h-4 sm:w-4" />
           </Button>
         </div>
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -782,6 +829,236 @@ function AddCustomerModal({ isOpen, onClose, onSave, isLoading }: AddCustomerMod
               </Button>
             </div>
           </form>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+interface CustomerDetailModalProps {
+  customer: any
+  detailerId: string
+  onClose: () => void
+}
+
+function CustomerDetailModal({ customer, detailerId, onClose }: CustomerDetailModalProps) {
+  const [personalizedMessage, setPersonalizedMessage] = useState('')
+  const [isSending, setIsSending] = useState(false)
+  const [sendStatus, setSendStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [errorMessage, setErrorMessage] = useState('')
+
+  const bookingLink = typeof window !== 'undefined' && detailerId ? `${window.location.origin}/book/${detailerId}` : ''
+
+  // Default message template
+  const defaultMessage = bookingLink 
+    ? `Hi ${customer.name}! We'd love to have you back for another service. Book your next appointment here: ${bookingLink}`
+    : `Hi ${customer.name}! We'd love to have you back for another service. Please contact us to book your next appointment.`
+
+  const handleSendSMS = async () => {
+    if (!customer.phone) {
+      setErrorMessage('Customer phone number is required')
+      setSendStatus('error')
+      return
+    }
+
+    if (!detailerId) {
+      setErrorMessage('Detailer booking link not available')
+      setSendStatus('error')
+      return
+    }
+
+    setIsSending(true)
+    setSendStatus('idle')
+    setErrorMessage('')
+
+    try {
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        throw new Error('Not authenticated')
+      }
+
+      // Use personalized message or default
+      // If personalized message is provided, append booking link if not already included
+      let messageToSend = personalizedMessage.trim() || defaultMessage
+      
+      // If using personalized message and booking link exists, append it if not already in message
+      if (personalizedMessage.trim() && bookingLink && !messageToSend.includes(bookingLink)) {
+        messageToSend = `${messageToSend}\n\nBook here: ${bookingLink}`
+      }
+
+      const response = await fetch('/api/sms/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          phoneNumber: customer.phone,
+          message: messageToSend,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        setSendStatus('success')
+        setPersonalizedMessage('')
+        // Close modal after 2 seconds
+        setTimeout(() => {
+          onClose()
+        }, 2000)
+      } else {
+        setSendStatus('error')
+        setErrorMessage(data.error || 'Failed to send SMS')
+      }
+    } catch (error: any) {
+      console.error('Error sending SMS:', error)
+      setSendStatus('error')
+      setErrorMessage(error.message || 'Failed to send SMS')
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 sm:p-6 z-50">
+      <div className="bg-card border border-border rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-4 sm:p-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <div>
+              <h2 className="text-lg sm:text-xl font-semibold text-foreground">Customer Details</h2>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">{customer.name}</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              disabled={isSending}
+              className="h-11 w-11 sm:h-10 sm:w-10"
+            >
+              <X className="h-6 w-6 sm:h-5 sm:w-5" />
+            </Button>
+          </div>
+
+          {/* Customer Info */}
+          <div className="space-y-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex items-center gap-2 text-sm">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                <span className="text-foreground">{customer.phone}</span>
+              </div>
+              {customer.email && (
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-foreground">{customer.email}</span>
+                </div>
+              )}
+              {customer.address && (
+                <div className="flex items-center gap-2 text-sm sm:col-span-2">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-foreground">{customer.address}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-sm">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="text-foreground">
+                  Last Service: {formatLastServiceDate(customer.lastServiceDate)}
+                </span>
+              </div>
+              <div className="text-sm">
+                <span className="text-muted-foreground">Total Spent: </span>
+                <span className="text-foreground font-medium">${customer.totalSpent.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* SMS Invite Section */}
+          <div className="border-t border-border pt-4 sm:pt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <MessageSquare className="h-5 w-5 text-primary" />
+              <h3 className="text-base sm:text-lg font-semibold text-foreground">Send Booking Invite</h3>
+            </div>
+            
+            <p className="text-xs sm:text-sm text-muted-foreground mb-4">
+              Send a personalized SMS inviting {customer.name} to book another service. The booking link will be included automatically.
+            </p>
+
+            {/* Personalized Message Input */}
+            <div className="space-y-2 mb-4">
+              <Label htmlFor="personalized-message" className="text-sm sm:text-base">
+                Personalized Message (Optional)
+              </Label>
+              <textarea
+                id="personalized-message"
+                value={personalizedMessage}
+                onChange={(e) => setPersonalizedMessage(e.target.value)}
+                placeholder={defaultMessage}
+                className="flex min-h-[120px] sm:min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-y"
+                disabled={isSending}
+                rows={4}
+              />
+              <p className="text-xs text-muted-foreground">
+                Leave blank to use default message, or customize it above. The booking link will be added automatically.
+              </p>
+            </div>
+
+            {/* Booking Link Preview */}
+            {bookingLink && (
+              <div className="bg-muted rounded-lg p-3 mb-4">
+                <p className="text-xs text-muted-foreground mb-1">Booking Link:</p>
+                <p className="text-xs sm:text-sm text-foreground break-all font-mono">{bookingLink}</p>
+              </div>
+            )}
+
+            {/* Status Messages */}
+            {sendStatus === 'success' && (
+              <div className="mb-4 p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg">
+                <p className="text-sm text-green-800 dark:text-green-200">
+                  ✓ SMS sent successfully!
+                </p>
+              </div>
+            )}
+
+            {sendStatus === 'error' && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg">
+                <p className="text-sm text-red-800 dark:text-red-200">
+                  {errorMessage || 'Failed to send SMS. Please try again.'}
+                </p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row gap-3 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 h-12 sm:h-11 w-full sm:w-auto order-2 sm:order-1"
+                onClick={onClose}
+                disabled={isSending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSendSMS}
+                className="flex-1 h-12 sm:h-11 w-full sm:w-auto order-1 sm:order-2"
+                disabled={isSending || !customer.phone}
+              >
+                {isSending ? (
+                  <>
+                    <span className="animate-spin mr-2">⏳</span>
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Send SMS Invite
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
