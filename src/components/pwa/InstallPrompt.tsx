@@ -17,6 +17,16 @@ export default function InstallPrompt() {
   const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
+    // IMMEDIATE desktop check - exit completely if desktop
+    const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent.toLowerCase() : ''
+    const isDesktopOS = /windows|macintosh|linux/i.test(userAgent) && !/android|iphone|ipad|ipod/i.test(userAgent)
+    
+    // If desktop OS, don't do anything at all
+    if (isDesktopOS) {
+      console.log('[InstallPrompt] Desktop OS detected, component disabled')
+      return
+    }
+
     // Check if already installed
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsStandalone(true)
@@ -24,26 +34,15 @@ export default function InstallPrompt() {
     }
 
     // Strict mobile device detection - only phones and tablets
-    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera
-    const ua = userAgent.toLowerCase()
+    const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
     
-    // Check for mobile device strings (strict matching)
-    const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(ua)
-    
-    // Additional check: exclude desktop browsers even if they have touch
-    // Desktop Chrome/Firefox/Safari on touchscreen laptops should not trigger
-    const isDesktopBrowser = /windows|macintosh|linux/i.test(ua) && !/android|iphone|ipad|ipod/i.test(ua)
-    
-    // Only show on actual mobile devices, not desktop browsers
-    const isMobileUser = isMobileDevice && !isDesktopBrowser
-    
-    setIsMobile(isMobileUser)
-
-    // Don't show prompt on desktop - exit early
-    if (!isMobileUser) {
-      console.log('[InstallPrompt] Desktop detected, not showing install prompt')
+    // Only show on actual mobile devices
+    if (!isMobileDevice) {
+      console.log('[InstallPrompt] Not a mobile device, component disabled')
       return
     }
+    
+    setIsMobile(true)
 
     // Check if iOS
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
@@ -111,16 +110,17 @@ export default function InstallPrompt() {
     localStorage.setItem('pwa-install-prompt-seen', 'true')
   }
 
-  // Don't show if already installed, not on mobile, or prompt not ready
-  // Double-check mobile status before rendering
-  if (isStandalone || !isMobile || !showPrompt) {
-    return null
+  // CRITICAL: Final desktop check before rendering anything
+  if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
+    const userAgent = navigator.userAgent.toLowerCase()
+    const isDesktopOS = /windows|macintosh|linux/i.test(userAgent) && !/android|iphone|ipad|ipod/i.test(userAgent)
+    if (isDesktopOS) {
+      return null // Don't render anything on desktop
+    }
   }
 
-  // Final safety check: verify we're actually on mobile before rendering
-  const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent.toLowerCase() : ''
-  const isDesktopBrowser = /windows|macintosh|linux/i.test(userAgent) && !/android|iphone|ipad|ipod/i.test(userAgent)
-  if (isDesktopBrowser) {
+  // Don't show if already installed, not on mobile, or prompt not ready
+  if (isStandalone || !isMobile || !showPrompt) {
     return null
   }
 
