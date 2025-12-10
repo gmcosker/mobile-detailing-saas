@@ -186,28 +186,29 @@ export default function PhotosPage() {
   // Show selected appointment photos
   if (selectedAppointment) {
     return (
-      <div className="p-4 space-y-6">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <Button
             variant="ghost"
             size="icon"
             onClick={handleBackToList}
+            className="h-11 w-11 sm:h-10 sm:w-10 flex-shrink-0"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-5 w-5 sm:h-4 sm:w-4" />
           </Button>
-          <div>
-            <h2 className="text-xl font-semibold text-foreground">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg sm:text-xl font-semibold text-foreground truncate">
               {selectedAppointment.customers?.name} - {selectedAppointment.service_type}
             </h2>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               {formatDate(selectedAppointment.scheduled_date)} at {formatTime(selectedAppointment.scheduled_time)}
             </p>
           </div>
         </div>
 
         {/* Photo Upload Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
           <PhotoUpload
             appointmentId={selectedAppointment.id}
             photoType="before"
@@ -259,22 +260,22 @@ export default function PhotosPage() {
 
   // Show appointments list
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Photo Management</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground">Photo Management</h2>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
             Upload and manage before/after photos for your appointments
           </p>
         </div>
       </div>
 
       {/* Recent Appointments */}
-      <div className="bg-card border border-border rounded-lg">
-        <div className="p-6 border-b border-border">
-          <h3 className="text-lg font-semibold text-foreground">Recent Appointments</h3>
-          <p className="text-sm text-muted-foreground">
+      <div className="bg-card border border-border rounded-lg overflow-hidden">
+        <div className="p-4 sm:p-6 border-b border-border">
+          <h3 className="text-base sm:text-lg font-semibold text-foreground">Recent Appointments</h3>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Select an appointment to manage photos
           </p>
         </div>
@@ -293,40 +294,52 @@ export default function PhotosPage() {
               <button
                 key={appointment.id}
                 onClick={() => setSelectedAppointment(appointment)}
-                className="w-full p-6 text-left hover:bg-accent transition-colors"
+                className="w-full p-4 sm:p-6 text-left hover:bg-accent active:bg-accent transition-colors min-h-[120px] sm:min-h-0"
               >
-                <div className="flex items-center justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                      <h4 className="font-medium text-foreground">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  {/* Left side - Customer info */}
+                  <div className="flex-1 space-y-2 sm:space-y-2 min-w-0">
+                    <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                      <h4 className="font-semibold text-base sm:text-sm text-foreground truncate">
                         {appointment.customers?.name || 'Unknown Customer'}
                       </h4>
-                      <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(appointment.status)}`}>
+                      <span className={`text-xs px-2.5 py-1 rounded-full flex-shrink-0 ${getStatusColor(appointment.status)}`}>
                         {appointment.status.replace('_', ' ')}
                       </span>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        {formatDate(appointment.scheduled_date)}
+                    
+                    {/* Date and Time - Stack on mobile */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <span className="truncate">{formatDate(appointment.scheduled_date)}</span>
                       </span>
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        {formatTime(appointment.scheduled_time)}
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                        <span>{formatTime(appointment.scheduled_time)}</span>
                       </span>
-                      <span>{appointment.service_type}</span>
+                      <span className="truncate font-medium">{appointment.service_type}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-6">
-                    <div className="text-base font-medium text-foreground">
-                      {appointmentPhotoCounts[appointment.id]?.before ?? 0} before photos
+
+                  {/* Right side - Photo counts and action */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 flex-shrink-0">
+                    {/* Photo counts - Stack on mobile */}
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+                      <div className="text-sm sm:text-base font-semibold text-foreground whitespace-nowrap">
+                        <span className="text-muted-foreground font-normal text-xs sm:text-sm">Before: </span>
+                        <span className="text-lg sm:text-base">{appointmentPhotoCounts[appointment.id]?.before ?? 0}</span>
+                      </div>
+                      <div className="text-sm sm:text-base font-semibold text-foreground whitespace-nowrap">
+                        <span className="text-muted-foreground font-normal text-xs sm:text-sm">After: </span>
+                        <span className="text-lg sm:text-base">{appointmentPhotoCounts[appointment.id]?.after ?? 0}</span>
+                      </div>
                     </div>
-                    <div className="text-base font-medium text-foreground">
-                      {appointmentPhotoCounts[appointment.id]?.after ?? 0} after photos
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Camera className="h-5 w-5 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">Manage Photos</span>
+                    
+                    {/* Manage Photos button - More prominent */}
+                    <div className="flex items-center justify-center sm:justify-end gap-2 bg-primary/10 hover:bg-primary/20 rounded-lg px-4 py-2.5 sm:py-2 transition-colors min-h-[44px] sm:min-h-0">
+                      <Camera className="h-5 w-5 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
+                      <span className="text-sm sm:text-xs font-semibold text-primary whitespace-nowrap">Manage Photos</span>
                     </div>
                   </div>
                 </div>
@@ -338,6 +351,7 @@ export default function PhotosPage() {
     </div>
   )
 }
+
 
 
 
