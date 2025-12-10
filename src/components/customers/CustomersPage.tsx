@@ -188,7 +188,8 @@ export default function CustomersPage() {
           totalSpent: totalSpent,
           lastServiceDate: lastServiceDate,
           lastVisit: lastServiceDate || (customer.updated_at ? new Date(customer.updated_at).toISOString().split('T')[0] : null),
-          status: lastServiceDate ? 'active' : 'inactive'
+          status: lastServiceDate ? 'active' : 'inactive',
+          last_booking_invite_sent_at: customer.last_booking_invite_sent_at || null
         }
       })
 
@@ -886,15 +887,16 @@ function CustomerDetailModal({ customer, detailerId, onClose }: CustomerDetailMo
         messageToSend = `${messageToSend}\n\nBook here: ${bookingLink}`
       }
 
-      const response = await fetch('/api/sms/send', {
+      // Use the booking invite endpoint which tracks the date
+      const response = await fetch(`/api/customers/${customer.id}/booking-invite`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          phoneNumber: customer.phone,
           message: messageToSend,
+          detailerId: detailerId,
         }),
       })
 
@@ -903,6 +905,10 @@ function CustomerDetailModal({ customer, detailerId, onClose }: CustomerDetailMo
       if (response.ok && data.success) {
         setSendStatus('success')
         setPersonalizedMessage('')
+        // Update customer object with new last_booking_invite_sent_at
+        if (data.lastBookingInviteSentAt) {
+          customer.last_booking_invite_sent_at = data.lastBookingInviteSentAt
+        }
         // Close modal after 2 seconds
         setTimeout(() => {
           onClose()
@@ -970,6 +976,20 @@ function CustomerDetailModal({ customer, detailerId, onClose }: CustomerDetailMo
                 <span className="text-muted-foreground">Total Spent: </span>
                 <span className="text-foreground font-medium">${customer.totalSpent.toFixed(2)}</span>
               </div>
+              {customer.last_booking_invite_sent_at && (
+                <div className="text-sm sm:col-span-2">
+                  <span className="text-muted-foreground">Last booking invite sent: </span>
+                  <span className="text-foreground font-medium">
+                    {new Date(customer.last_booking_invite_sent_at).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit'
+                    })}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

@@ -73,6 +73,7 @@ export type Database = {
           phone: string
           address: string | null
           notes: string | null
+          last_booking_invite_sent_at: string | null
         }
         Insert: {
           id?: string
@@ -83,6 +84,7 @@ export type Database = {
           phone: string
           address?: string | null
           notes?: string | null
+          last_booking_invite_sent_at?: string | null
         }
         Update: {
           id?: string
@@ -93,6 +95,7 @@ export type Database = {
           phone?: string
           address?: string | null
           notes?: string | null
+          last_booking_invite_sent_at?: string | null
         }
       }
       appointments: {
