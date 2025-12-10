@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -112,6 +112,7 @@ export default function CustomersPage() {
   const [filterDays, setFilterDays] = useState<string>('all') // 'all', '30', '60', '90', '180', '365'
   const [showFilters, setShowFilters] = useState(false)
   const [detailerId, setDetailerId] = useState<string>('')
+  const fetchCustomersRef = useRef<() => Promise<void>>()
 
   // Fetch customers from API and calculate last service dates
   const fetchCustomers = async () => {
@@ -273,6 +274,11 @@ export default function CustomersPage() {
 
     fetchDetailerId()
   }, [])
+
+  // Store fetchCustomers in ref so it can be called from modal
+  useEffect(() => {
+    fetchCustomersRef.current = fetchCustomers
+  }, [fetchCustomers])
 
   // Fetch customers on mount
   useEffect(() => {
@@ -525,6 +531,21 @@ export default function CustomersPage() {
           customer={selectedCustomer}
           detailerId={detailerId}
           onClose={() => setSelectedCustomer(null)}
+          onCustomerUpdated={async (customerId, updates) => {
+            // Update the customer in the list immediately
+            setAllCustomers(prev => prev.map(c => 
+              c.id === customerId ? { ...c, ...updates } : c
+            ))
+            setCustomers(prev => prev.map(c => 
+              c.id === customerId ? { ...c, ...updates } : c
+            ))
+            // Update selected customer
+            setSelectedCustomer(prev => prev ? { ...prev, ...updates } : null)
+            // Refresh customer data from API to ensure we have the latest
+            if (fetchCustomersRef.current) {
+              await fetchCustomersRef.current()
+            }
+          }}
         />
       )}
     </div>
@@ -625,6 +646,20 @@ function CustomerRow({ customer, onClick }: { customer: any; onClick: () => void
               </span>
             )}
           </div>
+
+          {/* Last Booking Invite Sent */}
+          {customer.last_booking_invite_sent_at && (
+            <div className="flex items-center gap-1.5 text-xs sm:text-sm text-blue-600 dark:text-blue-400">
+              <MessageSquare className="h-3.5 w-3.5 sm:h-3 sm:w-3 flex-shrink-0" />
+              <span className="font-medium">
+                Last invite: {new Date(customer.last_booking_invite_sent_at).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                })}
+              </span>
+            </div>
+          )}
         </div>
         
         <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-0">
@@ -840,9 +875,10 @@ interface CustomerDetailModalProps {
   customer: any
   detailerId: string
   onClose: () => void
+  onCustomerUpdated?: (customerId: string, updates: any) => void
 }
 
-function CustomerDetailModal({ customer, detailerId, onClose }: CustomerDetailModalProps) {
+function CustomerDetailModal({ customer, detailerId, onClose, onCustomerUpdated }: CustomerDetailModalProps) {
   const [personalizedMessage, setPersonalizedMessage] = useState('')
   const [isSending, setIsSending] = useState(false)
   const [sendStatus, setSendStatus] = useState<'idle' | 'success' | 'error'>('idle')
@@ -908,11 +944,12 @@ function CustomerDetailModal({ customer, detailerId, onClose }: CustomerDetailMo
         // Update customer object with new last_booking_invite_sent_at
         if (data.lastBookingInviteSentAt) {
           customer.last_booking_invite_sent_at = data.lastBookingInviteSentAt
+          // Notify parent to refresh customer data
+          if (onCustomerUpdated) {
+            onCustomerUpdated(customer.id, { last_booking_invite_sent_at: data.lastBookingInviteSentAt })
+          }
         }
-        // Close modal after 2 seconds
-        setTimeout(() => {
-          onClose()
-        }, 2000)
+        // Don't auto-close - let user see the success message and updated timestamp
       } else {
         setSendStatus('error')
         setErrorMessage(data.error || 'Failed to send SMS')
