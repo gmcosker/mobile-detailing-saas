@@ -943,11 +943,14 @@ function CustomerDetailModal({ customer, detailerId, onClose, onCustomerUpdated 
         setPersonalizedMessage('')
         // Update customer object with new last_booking_invite_sent_at
         if (data.lastBookingInviteSentAt) {
+          console.log('Booking invite sent, updating timestamp:', data.lastBookingInviteSentAt)
           customer.last_booking_invite_sent_at = data.lastBookingInviteSentAt
           // Notify parent to refresh customer data
           if (onCustomerUpdated) {
             onCustomerUpdated(customer.id, { last_booking_invite_sent_at: data.lastBookingInviteSentAt })
           }
+        } else {
+          console.warn('No lastBookingInviteSentAt in response:', data)
         }
         // Don't auto-close - let user see the success message and updated timestamp
       } else {
@@ -1014,9 +1017,10 @@ function CustomerDetailModal({ customer, detailerId, onClose, onCustomerUpdated 
                 <span className="text-foreground font-medium">${customer.totalSpent.toFixed(2)}</span>
               </div>
               {customer.last_booking_invite_sent_at && (
-                <div className="text-sm sm:col-span-2">
+                <div className="text-sm sm:col-span-2 flex items-center gap-2 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-2">
+                  <MessageSquare className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                   <span className="text-muted-foreground">Last booking invite sent: </span>
-                  <span className="text-foreground font-medium">
+                  <span className="text-blue-700 dark:text-blue-300 font-semibold">
                     {new Date(customer.last_booking_invite_sent_at).toLocaleDateString('en-US', {
                       month: 'short',
                       day: 'numeric',
