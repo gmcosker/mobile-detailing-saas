@@ -13,8 +13,47 @@ import {
   Phone,
   Mail,
   MapPin,
-  X
+  X,
+  Calendar
 } from 'lucide-react'
+
+// Helper function to format last service date
+function formatLastServiceDate(dateString: string | null): string {
+  if (!dateString) return 'Never'
+  
+  const date = new Date(dateString)
+  const today = new Date()
+  const diffTime = today.getTime() - date.getTime()
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+  
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays} days ago`
+  if (diffDays < 30) {
+    const weeks = Math.floor(diffDays / 7)
+    return `${weeks} week${weeks > 1 ? 's' : ''} ago`
+  }
+  if (diffDays < 365) {
+    const months = Math.floor(diffDays / 30)
+    return `${months} month${months > 1 ? 's' : ''} ago`
+  }
+  
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  })
+}
+
+// Helper function to get days since last service
+function getDaysSinceLastService(dateString: string | null): number | null {
+  if (!dateString) return null
+  
+  const date = new Date(dateString)
+  const today = new Date()
+  const diffTime = today.getTime() - date.getTime()
+  return Math.floor(diffTime / (1000 * 60 * 60 * 24))
+}
 
 // Mock data for now - this will come from the database later
 const mockCustomers = [
@@ -63,10 +102,14 @@ const mockCustomers = [
 export default function CustomersPage() {
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false)
   const [customers, setCustomers] = useState(mockCustomers)
+  const [allCustomers, setAllCustomers] = useState(mockCustomers) // Store all customers for filtering
   const [isLoading, setIsLoading] = useState(false)
   const [isFetching, setIsFetching] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterDays, setFilterDays] = useState<string>('all') // 'all', '30', '60', '90', '180', '365'
+  const [showFilters, setShowFilters] = useState(false)
 
-  // Fetch customers from API
+  // Fetch customers from API and calculate last service dates
   const fetchCustomers = async () => {
     setIsFetching(true)
     try {
@@ -77,43 +120,126 @@ export default function CustomersPage() {
         return
       }
 
-      const response = await fetch('/api/customers', {
+      // Fetch customers
+      const customersResponse = await fetch('/api/customers', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       })
 
-      const data = await response.json()
+      const customersData = await customersResponse.json()
 
-      console.log('Customers API response:', data)
+      if (!customersResponse.ok || !customersData.success || !customersData.customers) {
+        console.error('Failed to fetch customers:', customersData.error)
+        setCustomers([])
+        setAllCustomers([])
+        return
+      }
 
-      if (response.ok && data.success && data.customers) {
-        // Transform API data to match component format
-        const transformedCustomers = data.customers.map((customer: any) => ({
+      // Fetch appointments to calculate last service dates
+      const appointmentsResponse = await fetch('/api/appointments?limit=1000', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      const appointmentsData = await appointmentsResponse.json()
+      const appointments = appointmentsData.success ? appointmentsData.appointments || [] : []
+
+      // Calculate last service date for each customer
+      const customerLastServiceMap = new Map<string, string>()
+      const customerTotalSpentMap = new Map<string, number>()
+
+      appointments.forEach((apt: any) => {
+        if (apt.customer_id && apt.scheduled_date) {
+          const customerId = apt.customer_id
+          const serviceDate = apt.scheduled_date
+          
+          // Track most recent service date
+          const existingDate = customerLastServiceMap.get(customerId)
+          if (!existingDate || serviceDate > existingDate) {
+            customerLastServiceMap.set(customerId, serviceDate)
+          }
+          
+          // Calculate total spent
+          if (apt.total_amount && apt.payment_status === 'paid') {
+            const currentTotal = customerTotalSpentMap.get(customerId) || 0
+            customerTotalSpentMap.set(customerId, currentTotal + (apt.total_amount || 0))
+          }
+        }
+      })
+
+      // Transform API data to match component format
+      const transformedCustomers = customersData.customers.map((customer: any) => {
+        const lastServiceDate = customerLastServiceMap.get(customer.id) || null
+        const totalSpent = customerTotalSpentMap.get(customer.id) || 0
+        
+        return {
           id: customer.id,
           name: customer.name,
           phone: customer.phone,
           email: customer.email || '',
           address: customer.address || '',
-          totalSpent: 0, // This would come from appointments in a real implementation
-          lastVisit: customer.updated_at ? new Date(customer.updated_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          status: 'active'
-        }))
-        setCustomers(transformedCustomers)
-        console.log('Set customers:', transformedCustomers)
-      } else {
-        console.error('Failed to fetch customers:', data.error)
-        // Set empty array if API fails
-        setCustomers([])
-      }
+          totalSpent: totalSpent,
+          lastServiceDate: lastServiceDate,
+          lastVisit: lastServiceDate || (customer.updated_at ? new Date(customer.updated_at).toISOString().split('T')[0] : null),
+          status: lastServiceDate ? 'active' : 'inactive'
+        }
+      })
+
+      setAllCustomers(transformedCustomers)
+      applyFilters(transformedCustomers, searchTerm, filterDays)
     } catch (error) {
       console.error('Error fetching customers:', error)
-      // Set empty array on error instead of keeping mock data
       setCustomers([])
+      setAllCustomers([])
     } finally {
       setIsFetching(false)
     }
+  }
+
+  // Apply search and filter logic
+  const applyFilters = (customersToFilter: any[], search: string, daysFilter: string) => {
+    let filtered = [...customersToFilter]
+
+    // Apply search filter
+    if (search.trim()) {
+      const searchLower = search.toLowerCase()
+      filtered = filtered.filter(c => 
+        c.name.toLowerCase().includes(searchLower) ||
+        c.email?.toLowerCase().includes(searchLower) ||
+        c.phone.includes(search) ||
+        (c.lastServiceDate && formatLastServiceDate(c.lastServiceDate).toLowerCase().includes(searchLower))
+      )
+    }
+
+    // Apply days filter (customers not serviced in X days)
+    if (daysFilter !== 'all') {
+      const days = parseInt(daysFilter)
+      const cutoffDate = new Date()
+      cutoffDate.setDate(cutoffDate.getDate() - days)
+      const cutoffDateString = cutoffDate.toISOString().split('T')[0]
+
+      filtered = filtered.filter(c => {
+        if (!c.lastServiceDate) return true // Include customers with no service date
+        return c.lastServiceDate < cutoffDateString
+      })
+    }
+
+    setCustomers(filtered)
+  }
+
+  // Handle search input
+  const handleSearchChange = (value: string) => {
+    setSearchTerm(value)
+    applyFilters(allCustomers, value, filterDays)
+  }
+
+  // Handle filter change
+  const handleFilterChange = (days: string) => {
+    setFilterDays(days)
+    applyFilters(allCustomers, searchTerm, days)
   }
 
   // Fetch customers on mount
@@ -187,19 +313,109 @@ export default function CustomersPage() {
       </div>
 
       {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 sm:h-4 sm:w-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search customers..."
-            className="w-full pl-10 sm:pl-10 pr-4 py-3 sm:py-2 border border-border rounded-lg bg-background text-base sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px] sm:min-h-0"
-          />
+      <div className="flex flex-col gap-3 sm:gap-4">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 sm:h-4 sm:w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search customers, phone, email, or last service date..."
+              value={searchTerm}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full pl-10 sm:pl-10 pr-4 py-3 sm:py-2 border border-border rounded-lg bg-background text-base sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px] sm:min-h-0"
+            />
+          </div>
+          <Button 
+            variant="outline" 
+            className="h-12 sm:h-11 w-full sm:w-auto"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter className="h-5 w-5 sm:h-4 sm:w-4 mr-2" />
+            Filters {filterDays !== 'all' && `(${filterDays}d)`}
+          </Button>
         </div>
-        <Button variant="outline" className="h-12 sm:h-11 w-full sm:w-auto">
-          <Filter className="h-5 w-5 sm:h-4 sm:w-4 mr-2" />
-          Filters
-        </Button>
+
+        {/* Filter Options */}
+        {showFilters && (
+          <div className="bg-card border border-border rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-foreground">Filter by Last Service</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setFilterDays('all')
+                  applyFilters(allCustomers, searchTerm, 'all')
+                }}
+                className="h-8 text-xs"
+              >
+                Clear
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <button
+                onClick={() => handleFilterChange('all')}
+                className={`px-3 py-3 sm:py-2 rounded-lg text-sm font-medium transition-colors min-h-[44px] sm:min-h-0 ${
+                  filterDays === 'all'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted hover:bg-muted/80 text-foreground'
+                }`}
+              >
+                All Customers
+              </button>
+              <button
+                onClick={() => handleFilterChange('30')}
+                className={`px-3 py-3 sm:py-2 rounded-lg text-sm font-medium transition-colors min-h-[44px] sm:min-h-0 ${
+                  filterDays === '30'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted hover:bg-muted/80 text-foreground'
+                }`}
+              >
+                30+ Days
+              </button>
+              <button
+                onClick={() => handleFilterChange('60')}
+                className={`px-3 py-3 sm:py-2 rounded-lg text-sm font-medium transition-colors min-h-[44px] sm:min-h-0 ${
+                  filterDays === '60'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted hover:bg-muted/80 text-foreground'
+                }`}
+              >
+                60+ Days
+              </button>
+              <button
+                onClick={() => handleFilterChange('90')}
+                className={`px-3 py-3 sm:py-2 rounded-lg text-sm font-medium transition-colors min-h-[44px] sm:min-h-0 ${
+                  filterDays === '90'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted hover:bg-muted/80 text-foreground'
+                }`}
+              >
+                90+ Days
+              </button>
+              <button
+                onClick={() => handleFilterChange('180')}
+                className={`px-3 py-3 sm:py-2 rounded-lg text-sm font-medium transition-colors min-h-[44px] sm:min-h-0 ${
+                  filterDays === '180'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted hover:bg-muted/80 text-foreground'
+                }`}
+              >
+                180+ Days
+              </button>
+              <button
+                onClick={() => handleFilterChange('365')}
+                className={`px-3 py-3 sm:py-2 rounded-lg text-sm font-medium transition-colors min-h-[44px] sm:min-h-0 ${
+                  filterDays === '365'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted hover:bg-muted/80 text-foreground'
+                }`}
+              >
+                1+ Year
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats */}
@@ -217,14 +433,17 @@ export default function CustomersPage() {
           color="green"
         />
         <StatCard
-          title="This Month"
-          value={customers.length.toString()}
+          title="Prospects"
+          value={customers.filter(c => {
+            const days = getDaysSinceLastService(c.lastServiceDate)
+            return days !== null && days > 30
+          }).length.toString()}
           icon={Users}
           color="purple"
         />
         <StatCard
           title="Revenue"
-          value={`$${customers.reduce((sum, c) => sum + c.totalSpent, 0)}`}
+          value={`$${customers.reduce((sum, c) => sum + c.totalSpent, 0).toFixed(0)}`}
           icon={Users}
           color="orange"
         />
@@ -301,8 +520,19 @@ function StatCard({
 }
 
 function CustomerRow({ customer }: { customer: any }) {
+  const daysSince = getDaysSinceLastService(customer.lastServiceDate)
+  const lastServiceFormatted = formatLastServiceDate(customer.lastServiceDate)
+  
+  // Color coding for last service date
+  const getLastServiceColor = () => {
+    if (!daysSince) return 'text-gray-500'
+    if (daysSince <= 30) return 'text-green-600 dark:text-green-400'
+    if (daysSince <= 90) return 'text-orange-600 dark:text-orange-400'
+    return 'text-red-600 dark:text-red-400'
+  }
+
   return (
-    <div className="p-4 sm:p-5 hover:bg-accent/50 transition-colors min-h-[80px] sm:min-h-0">
+    <div className="p-4 sm:p-5 hover:bg-accent/50 transition-colors min-h-[100px] sm:min-h-0">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 sm:gap-3 mb-2">
@@ -316,7 +546,7 @@ function CustomerRow({ customer }: { customer: any }) {
             </span>
           </div>
           
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground mb-2">
             <div className="flex items-center gap-1 truncate">
               <Phone className="h-3.5 w-3.5 sm:h-3 sm:w-3 flex-shrink-0" />
               <span className="truncate">{customer.phone}</span>
@@ -334,12 +564,25 @@ function CustomerRow({ customer }: { customer: any }) {
               </div>
             )}
           </div>
+
+          {/* Last Service Date */}
+          <div className="flex items-center gap-1.5 text-xs sm:text-sm">
+            <Calendar className={`h-3.5 w-3.5 sm:h-3 sm:w-3 flex-shrink-0 ${getLastServiceColor()}`} />
+            <span className={`font-medium ${getLastServiceColor()}`}>
+              Last Service: {lastServiceFormatted}
+            </span>
+            {daysSince !== null && daysSince > 30 && (
+              <span className="text-xs px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-300">
+                Prospect
+              </span>
+            )}
+          </div>
         </div>
         
         <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-0">
           <div className="text-left sm:text-right">
-            <div className="font-medium text-base sm:text-sm text-foreground">${customer.totalSpent}</div>
-            <div className="text-xs sm:text-sm text-muted-foreground">Last: {customer.lastVisit}</div>
+            <div className="font-medium text-base sm:text-sm text-foreground">${customer.totalSpent.toFixed(2)}</div>
+            <div className="text-xs sm:text-sm text-muted-foreground">Total Spent</div>
           </div>
           
           <Button variant="ghost" size="icon" className="h-11 w-11 sm:h-10 sm:w-10 flex-shrink-0">
