@@ -1038,7 +1038,6 @@ function CustomerDetailModal({ customer, detailerId, onClose, onCustomerUpdated 
                 </div>
               </div>
             ) : null}
-            </div>
           </div>
 
           {/* SMS Invite Section */}
