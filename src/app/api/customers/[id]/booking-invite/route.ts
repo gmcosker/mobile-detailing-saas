@@ -132,11 +132,17 @@ export async function POST(
 
     if (updateError) {
       console.error('Error updating booking invite timestamp:', updateError)
+      // Check if error is due to missing column
+      const isColumnMissing = updateError.message?.includes('column') && 
+                              updateError.message?.includes('does not exist')
+      
       // SMS was sent but we couldn't track it - still return success
       return NextResponse.json({
         success: true,
         messageId: result.messageId,
-        message: 'SMS sent successfully (tracking update failed)'
+        message: 'SMS sent successfully (tracking update failed)',
+        error: updateError.message,
+        columnMissing: isColumnMissing || false
       })
     }
 

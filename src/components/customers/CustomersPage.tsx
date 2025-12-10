@@ -960,22 +960,30 @@ function CustomerDetailModal({ customer, detailerId, onClose, onCustomerUpdated 
         setPersonalizedMessage('')
         // Update customer object with new last_booking_invite_sent_at
         if (data.lastBookingInviteSentAt) {
-          console.log('[DEBUG] Booking invite sent, updating timestamp:', data.lastBookingInviteSentAt)
+          console.log('[DEBUG] ✅ Booking invite sent, updating timestamp:', data.lastBookingInviteSentAt)
           customer.last_booking_invite_sent_at = data.lastBookingInviteSentAt
           // Notify parent to refresh customer data
           if (onCustomerUpdated) {
-            console.log('[DEBUG] Calling onCustomerUpdated with:', customer.id, data.lastBookingInviteSentAt)
+            console.log('[DEBUG] ✅ Calling onCustomerUpdated with:', customer.id, data.lastBookingInviteSentAt)
             onCustomerUpdated(customer.id, { last_booking_invite_sent_at: data.lastBookingInviteSentAt })
           }
         } else {
-          console.warn('[DEBUG] No lastBookingInviteSentAt in response. Full response:', data)
-          console.warn('[DEBUG] This likely means the database column "last_booking_invite_sent_at" does not exist. Please run the migration.')
+          console.error('[DEBUG] ❌ No lastBookingInviteSentAt in response. Full response:', data)
+          if (data.columnMissing || data.error?.includes('column') || data.error?.includes('does not exist')) {
+            console.error('[DEBUG] ❌❌❌ DATABASE COLUMN MISSING! ❌❌❌')
+            console.error('[DEBUG] The "last_booking_invite_sent_at" column does not exist in your database.')
+            console.error('[DEBUG] Please run this SQL in your Supabase SQL Editor:')
+            console.error('[DEBUG] ALTER TABLE customers ADD COLUMN IF NOT EXISTS last_booking_invite_sent_at TIMESTAMP WITH TIME ZONE;')
+            alert('⚠️ Database column missing! Please run the migration. Check console for details.')
+          } else {
+            console.warn('[DEBUG] This likely means the database column "last_booking_invite_sent_at" does not exist. Please run the migration.')
+          }
         }
         // Don't auto-close - let user see the success message and updated timestamp
       } else {
         setSendStatus('error')
         setErrorMessage(data.error || 'Failed to send SMS')
-        console.error('[DEBUG] SMS send failed:', data)
+        console.error('[DEBUG] ❌ SMS send failed:', data)
       }
     } catch (error: any) {
       console.error('Error sending SMS:', error)
