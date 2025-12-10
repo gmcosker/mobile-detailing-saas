@@ -180,6 +180,11 @@ export default function CustomersPage() {
         const lastServiceDate = customerLastServiceMap.get(customer.id) || null
         const totalSpent = customerTotalSpentMap.get(customer.id) || 0
         
+        // Debug: Log if last_booking_invite_sent_at exists
+        if (customer.last_booking_invite_sent_at) {
+          console.log(`[DEBUG] Customer ${customer.name} has last_booking_invite_sent_at:`, customer.last_booking_invite_sent_at)
+        }
+        
         return {
           id: customer.id,
           name: customer.name,
@@ -532,13 +537,22 @@ export default function CustomersPage() {
           detailerId={detailerId}
           onClose={() => setSelectedCustomer(null)}
           onCustomerUpdated={async (customerId, updates) => {
+            console.log('[DEBUG] onCustomerUpdated called with:', customerId, updates)
             // Update the customer in the list immediately
-            setAllCustomers(prev => prev.map(c => 
-              c.id === customerId ? { ...c, ...updates } : c
-            ))
-            setCustomers(prev => prev.map(c => 
-              c.id === customerId ? { ...c, ...updates } : c
-            ))
+            setAllCustomers(prev => {
+              const updated = prev.map(c => 
+                c.id === customerId ? { ...c, ...updates } : c
+              )
+              console.log('[DEBUG] Updated allCustomers. Customer now has:', updated.find(c => c.id === customerId)?.last_booking_invite_sent_at)
+              return updated
+            })
+            setCustomers(prev => {
+              const updated = prev.map(c => 
+                c.id === customerId ? { ...c, ...updates } : c
+              )
+              console.log('[DEBUG] Updated customers. Customer now has:', updated.find(c => c.id === customerId)?.last_booking_invite_sent_at)
+              return updated
+            })
             // Update selected customer
             setSelectedCustomer(prev => prev ? { ...prev, ...updates } : null)
             // Refresh customer data from API to ensure we have the latest
@@ -648,7 +662,7 @@ function CustomerRow({ customer, onClick }: { customer: any; onClick: () => void
           </div>
 
           {/* Last Booking Invite Sent */}
-          {customer.last_booking_invite_sent_at && (
+          {customer.last_booking_invite_sent_at ? (
             <div className="flex items-center gap-1.5 text-xs sm:text-sm text-blue-600 dark:text-blue-400">
               <MessageSquare className="h-3.5 w-3.5 sm:h-3 sm:w-3 flex-shrink-0" />
               <span className="font-medium">
@@ -659,6 +673,9 @@ function CustomerRow({ customer, onClick }: { customer: any; onClick: () => void
                 })}
               </span>
             </div>
+          ) : (
+            // Debug: Show if customer exists but has no invite timestamp
+            process.env.NODE_ENV === 'development' && console.log('[DEBUG] Customer', customer.name, 'has no last_booking_invite_sent_at')
           )}
         </div>
         
@@ -943,19 +960,22 @@ function CustomerDetailModal({ customer, detailerId, onClose, onCustomerUpdated 
         setPersonalizedMessage('')
         // Update customer object with new last_booking_invite_sent_at
         if (data.lastBookingInviteSentAt) {
-          console.log('Booking invite sent, updating timestamp:', data.lastBookingInviteSentAt)
+          console.log('[DEBUG] Booking invite sent, updating timestamp:', data.lastBookingInviteSentAt)
           customer.last_booking_invite_sent_at = data.lastBookingInviteSentAt
           // Notify parent to refresh customer data
           if (onCustomerUpdated) {
+            console.log('[DEBUG] Calling onCustomerUpdated with:', customer.id, data.lastBookingInviteSentAt)
             onCustomerUpdated(customer.id, { last_booking_invite_sent_at: data.lastBookingInviteSentAt })
           }
         } else {
-          console.warn('No lastBookingInviteSentAt in response:', data)
+          console.warn('[DEBUG] No lastBookingInviteSentAt in response. Full response:', data)
+          console.warn('[DEBUG] This likely means the database column "last_booking_invite_sent_at" does not exist. Please run the migration.')
         }
         // Don't auto-close - let user see the success message and updated timestamp
       } else {
         setSendStatus('error')
         setErrorMessage(data.error || 'Failed to send SMS')
+        console.error('[DEBUG] SMS send failed:', data)
       }
     } catch (error: any) {
       console.error('Error sending SMS:', error)
@@ -1037,7 +1057,10 @@ function CustomerDetailModal({ customer, detailerId, onClose, onCustomerUpdated 
                   </div>
                 </div>
               </div>
-            ) : null}
+            ) : (
+              // Debug: Log if customer exists but has no invite timestamp
+              process.env.NODE_ENV === 'development' && console.log('[DEBUG MODAL] Customer', customer.name, 'has no last_booking_invite_sent_at. Value:', customer.last_booking_invite_sent_at)
+            )}
           </div>
 
           {/* SMS Invite Section */}
