@@ -26,6 +26,15 @@ export default function InstallPrompt() {
     const iOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
     setIsIOS(iOS)
 
+    // For iOS, show prompt immediately (no beforeinstallprompt event)
+    if (iOS) {
+      const hasSeenPrompt = localStorage.getItem('pwa-install-prompt-seen')
+      if (!hasSeenPrompt) {
+        // Show after a short delay on iOS
+        setTimeout(() => setShowPrompt(true), 2000)
+      }
+    }
+
     // Listen for beforeinstallprompt event (Android/Chrome)
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
@@ -79,8 +88,13 @@ export default function InstallPrompt() {
     localStorage.setItem('pwa-install-prompt-seen', 'true')
   }
 
-  // Don't show if already installed or no prompt available
-  if (isStandalone || (!deferredPrompt && !isIOS) || !showPrompt) {
+  // Don't show if already installed
+  if (isStandalone || !showPrompt) {
+    return null
+  }
+
+  // Show on iOS even without deferredPrompt, or on Android if deferredPrompt exists
+  if (!isIOS && !deferredPrompt) {
     return null
   }
 
