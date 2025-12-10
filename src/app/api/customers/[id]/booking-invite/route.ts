@@ -111,7 +111,7 @@ export async function POST(
     }
 
     // Update customer's last_booking_invite_sent_at timestamp
-    const supabase = getSupabaseClient()
+    // Reuse the supabase client we already have
     if (!supabase) {
       // SMS was sent but we couldn't track it - still return success
       console.warn('Could not update booking invite timestamp - database connection failed')
