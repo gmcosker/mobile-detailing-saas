@@ -74,17 +74,24 @@ export async function POST(
       .limit(1)
       .maybeSingle()
 
-    // If no appointment found and there was an error, log it
-    // But we'll still allow access since the customer was successfully fetched
-    // and the customer list is already filtered by detailer
+    // Verify access: customer must have at least one appointment with this detailer
+    // (including placeholder appointments for manually added customers)
     if (appointmentError) {
-      console.warn('Error checking appointment access:', appointmentError)
+      console.error('Error checking appointment access:', appointmentError)
+      return NextResponse.json(
+        { success: false, error: 'Failed to verify customer access' },
+        { status: 500 }
+      )
     }
 
-    // Note: We don't block access even if no appointment is found, because:
-    // 1. The customer list is already filtered by detailer
-    // 2. Manually added customers have placeholder appointments
-    // 3. If the customer is visible in the list, they should have access
+    // If no appointment found, deny access
+    // This ensures customers can only receive invites if they're linked to this detailer
+    if (!appointmentData) {
+      return NextResponse.json(
+        { success: false, error: 'Customer not found in your customer list' },
+        { status: 403 }
+      )
+    }
 
     if (!customer.phone) {
       return NextResponse.json(
