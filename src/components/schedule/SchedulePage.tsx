@@ -483,38 +483,40 @@ export default function SchedulePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Schedule</h1>
-          <p className="text-muted-foreground">Manage your appointments and availability</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Schedule</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage your appointments and availability</p>
         </div>
         <Button 
-          className="w-full sm:w-auto"
+          className="w-full sm:w-auto h-12 sm:h-11"
           onClick={() => setNewAppointmentModal({ open: true })}
         >
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-5 w-5 sm:h-4 sm:w-4 mr-2" />
           New Appointment
         </Button>
       </div>
 
       {/* Calendar View Toggle */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 sm:gap-3">
         <Button 
           variant={viewMode === 'calendar' ? 'default' : 'outline'} 
           size="sm"
+          className="h-12 sm:h-10 flex-1 sm:flex-initial"
           onClick={() => setViewMode('calendar')}
         >
-          <Calendar className="h-4 w-4 mr-2" />
+          <Calendar className="h-5 w-5 sm:h-4 sm:w-4 mr-2" />
           Calendar View
         </Button>
         <Button 
           variant={viewMode === 'list' ? 'default' : 'outline'} 
           size="sm"
+          className="h-12 sm:h-10 flex-1 sm:flex-initial"
           onClick={() => setViewMode('list')}
         >
-          <Clock className="h-4 w-4 mr-2" />
+          <Clock className="h-5 w-5 sm:h-4 sm:w-4 mr-2" />
           List View
         </Button>
       </div>
@@ -540,26 +542,26 @@ export default function SchedulePage() {
           {/* Today's Appointments */}
       <div>
         <div 
-          className="flex items-center justify-between mb-4 cursor-pointer"
+          className="flex items-center justify-between mb-4 cursor-pointer min-h-[44px] px-2 -mx-2"
           onClick={() => toggleSection('today')}
         >
-          <h2 className="text-lg font-semibold text-foreground">Today's Appointments</h2>
-          <Button variant="ghost" size="icon" className="h-6 w-6">
+          <h2 className="text-base sm:text-lg font-semibold text-foreground">Today's Appointments</h2>
+          <Button variant="ghost" size="icon" className="h-11 w-11 sm:h-10 sm:w-10">
             {expandedSections.today ? (
-              <ChevronUp className="h-4 w-4" />
+              <ChevronUp className="h-5 w-5 sm:h-4 sm:w-4" />
             ) : (
-              <ChevronDown className="h-4 w-4" />
+              <ChevronDown className="h-5 w-5 sm:h-4 sm:w-4" />
             )}
           </Button>
         </div>
         {expandedSections.today && (
           <>
             {todayAppointments.length === 0 ? (
-              <div className="bg-card border border-border rounded-lg p-8 text-center">
-                <p className="text-muted-foreground">No appointments scheduled for today</p>
+              <div className="bg-card border border-border rounded-lg p-6 sm:p-8 text-center">
+                <p className="text-sm sm:text-base text-muted-foreground">No appointments scheduled for today</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {todayAppointments.map((appointment) => (
                   <AppointmentCard 
                     key={appointment.id} 
@@ -891,21 +893,21 @@ function AppointmentCard({
   const customer = appointment.customers
 
   return (
-    <div className="bg-card border border-border rounded-lg p-4">
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <div className="bg-primary/10 p-2 rounded-lg">
-            <Car className="h-4 w-4 text-primary" />
+    <div className="bg-card border border-border rounded-lg p-4 sm:p-5">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-0 mb-3 sm:mb-4">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="bg-primary/10 p-2 sm:p-2.5 rounded-lg flex-shrink-0">
+            <Car className="h-5 w-5 sm:h-4 sm:w-4 text-primary" />
           </div>
-          <div>
-            <div className="font-medium text-foreground">{customer.name}</div>
-            <div className="text-sm text-muted-foreground">{appointment.service_type}</div>
+          <div className="min-w-0 flex-1">
+            <div className="font-medium text-base sm:text-sm text-foreground truncate">{customer.name}</div>
+            <div className="text-sm sm:text-xs text-muted-foreground truncate">{appointment.service_type}</div>
           </div>
         </div>
         
-        <div className="text-right">
-          <div className="font-medium text-foreground">{formatTime(appointment.scheduled_time)}</div>
-          <div className="text-sm text-muted-foreground">{new Date(appointment.scheduled_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+        <div className="text-left sm:text-right flex-shrink-0">
+          <div className="font-medium text-base sm:text-sm text-foreground">{formatTime(appointment.scheduled_time)}</div>
+          <div className="text-sm sm:text-xs text-muted-foreground">{new Date(appointment.scheduled_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
         </div>
       </div>
 
@@ -944,67 +946,72 @@ function AppointmentCard({
         </div>
       )}
 
-      <div className="flex gap-2 mt-4 flex-wrap">
-        {appointment.status === 'pending' && (
-          <Button 
-            size="sm" 
-            onClick={() => onConfirm?.(appointment.id)}
-            disabled={isConfirming}
-            className="bg-green-600 hover:bg-green-700 text-white"
-          >
-            {isConfirming ? (
-              <>
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                Confirming...
-              </>
-            ) : (
-              <>
-                <CheckCircle className="h-3 w-3 mr-1" />
-                Confirm
-              </>
-            )}
-          </Button>
-        )}
-        {appointment.status !== 'cancelled' && appointment.status !== 'completed' && (
-          <>
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-2 mt-4">
+        <div className="flex flex-col sm:flex-row gap-2 flex-1">
+          {appointment.status === 'pending' && (
+            <Button 
+              size="sm" 
+              onClick={() => onConfirm?.(appointment.id)}
+              disabled={isConfirming}
+              className="bg-green-600 hover:bg-green-700 text-white h-12 sm:h-10 w-full sm:w-auto"
+            >
+              {isConfirming ? (
+                <>
+                  <Loader2 className="h-4 w-4 sm:h-3 sm:w-3 mr-2 sm:mr-1 animate-spin" />
+                  Confirming...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="h-4 w-4 sm:h-3 sm:w-3 mr-2 sm:mr-1" />
+                  Confirm
+                </>
+              )}
+            </Button>
+          )}
+          {appointment.status !== 'cancelled' && appointment.status !== 'completed' && (
+            <>
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => onReschedule?.(appointment)}
+                disabled={!!actionLoading}
+                className="h-12 sm:h-10 w-full sm:w-auto"
+              >
+                Reschedule
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => onCancel?.(appointment)}
+                disabled={!!actionLoading}
+                className="text-red-600 hover:text-red-700 hover:border-red-300 h-12 sm:h-10 w-full sm:w-auto"
+              >
+                Cancel
+              </Button>
+            </>
+          )}
+          {appointment.status !== 'cancelled' && (
             <Button 
               size="sm" 
               variant="outline"
-              onClick={() => onReschedule?.(appointment)}
-              disabled={!!actionLoading}
+              onClick={() => onSendReminder?.(appointment.id)}
+              disabled={!!actionLoading || actionLoading === `reminder-${appointment.id}`}
+              className="h-12 sm:h-10 w-full sm:w-auto"
             >
-              Reschedule
+              {actionLoading === `reminder-${appointment.id}` ? (
+                <>
+                  <Loader2 className="h-4 w-4 sm:h-3 sm:w-3 mr-2 sm:mr-1 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                'Send Reminder'
+              )}
             </Button>
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={() => onCancel?.(appointment)}
-              disabled={!!actionLoading}
-              className="text-red-600 hover:text-red-700 hover:border-red-300"
-            >
-              Cancel
-            </Button>
-          </>
-        )}
-        {appointment.status !== 'cancelled' && (
-          <Button 
-            size="sm" 
-            variant="outline"
-            onClick={() => onSendReminder?.(appointment.id)}
-            disabled={!!actionLoading || actionLoading === `reminder-${appointment.id}`}
-          >
-            {actionLoading === `reminder-${appointment.id}` ? (
-              <>
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                Sending...
-              </>
-            ) : (
-              'Send Reminder'
-            )}
-          </Button>
-        )}
+          )}
+        </div>
         <Button 
-          size="sm" 
+          size="sm"
+          className="h-12 sm:h-10 w-full sm:w-auto" 
           variant="outline"
           onClick={() => onViewDetails?.(appointment)}
           disabled={!!actionLoading}
@@ -1017,11 +1024,11 @@ function AppointmentCard({
             variant="outline"
             onClick={() => onClear?.(appointment.id)}
             disabled={!!actionLoading || actionLoading === `clear-${appointment.id}`}
-            className="text-gray-600 hover:text-gray-700 hover:border-gray-300"
+            className="text-gray-600 hover:text-gray-700 hover:border-gray-300 h-12 sm:h-10 w-full sm:w-auto"
           >
             {actionLoading === `clear-${appointment.id}` ? (
               <>
-                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                <Loader2 className="h-4 w-4 sm:h-3 sm:w-3 mr-2 sm:mr-1 animate-spin" />
                 Clearing...
               </>
             ) : (
@@ -1067,13 +1074,13 @@ function RescheduleModal({
   })
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-card border border-border rounded-lg shadow-lg max-w-md w-full">
-        <div className="p-6">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 sm:p-6 z-50">
+      <div className="bg-card border border-border rounded-lg shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-foreground">Reschedule Appointment</h2>
-            <Button variant="ghost" size="icon" onClick={onClose} disabled={isLoading}>
-              <X className="h-5 w-5" />
+            <h2 className="text-lg sm:text-xl font-semibold text-foreground">Reschedule Appointment</h2>
+            <Button variant="ghost" size="icon" onClick={onClose} disabled={isLoading} className="h-11 w-11 sm:h-10 sm:w-10">
+              <X className="h-6 w-6 sm:h-5 sm:w-5" />
             </Button>
           </div>
 
@@ -1085,23 +1092,23 @@ function RescheduleModal({
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="reschedule-reason">Reason for Rescheduling *</Label>
+              <Label htmlFor="reschedule-reason" className="text-sm sm:text-base">Reason for Rescheduling *</Label>
               <textarea
                 id="reschedule-reason"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="Please explain why this appointment needs to be rescheduled..."
-                className="w-full mt-2 p-3 border border-input bg-background rounded-md text-sm min-h-[100px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full mt-2 p-3 border border-input bg-background rounded-md text-base sm:text-sm min-h-[120px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 required
                 disabled={isLoading}
               />
             </div>
 
-            <div className="flex gap-2 justify-end">
-              <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
+            <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
+              <Button type="button" variant="outline" onClick={onClose} disabled={isLoading} className="h-12 sm:h-11 w-full sm:w-auto order-2 sm:order-1">
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading || reason.trim().length === 0}>
+              <Button type="submit" disabled={isLoading || reason.trim().length === 0} className="h-12 sm:h-11 w-full sm:w-auto order-1 sm:order-2">
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1152,13 +1159,13 @@ function CancelModal({
   })
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-card border border-border rounded-lg shadow-lg max-w-md w-full">
-        <div className="p-6">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 sm:p-6 z-50">
+      <div className="bg-card border border-border rounded-lg shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-4 sm:p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-foreground">Cancel Appointment</h2>
-            <Button variant="ghost" size="icon" onClick={onClose} disabled={isLoading}>
-              <X className="h-5 w-5" />
+            <h2 className="text-lg sm:text-xl font-semibold text-foreground">Cancel Appointment</h2>
+            <Button variant="ghost" size="icon" onClick={onClose} disabled={isLoading} className="h-11 w-11 sm:h-10 sm:w-10">
+              <X className="h-6 w-6 sm:h-5 sm:w-5" />
             </Button>
           </div>
 
@@ -1171,19 +1178,19 @@ function CancelModal({
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="cancel-reason">Reason for Cancellation *</Label>
+              <Label htmlFor="cancel-reason" className="text-sm sm:text-base">Reason for Cancellation *</Label>
               <textarea
                 id="cancel-reason"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="Please explain why this appointment is being cancelled..."
-                className="w-full mt-2 p-3 border border-input bg-background rounded-md text-sm min-h-[100px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full mt-2 p-3 border border-input bg-background rounded-md text-base sm:text-sm min-h-[120px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 required
                 disabled={isLoading}
               />
             </div>
 
-            <div className="flex gap-2 justify-end">
+            <div className="flex flex-col sm:flex-row gap-2 sm:justify-end">
               <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
                 Keep Appointment
               </Button>

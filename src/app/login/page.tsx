@@ -105,20 +105,20 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-12">
-      <div className="w-full max-w-md space-y-8">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 sm:px-6 py-8 sm:py-12">
+      <div className="w-full max-w-md space-y-6 sm:space-y-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
             {isSignUp ? 'Create Account' : 'Sign In'}
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 text-sm sm:text-base text-muted-foreground">
             {isSignUp
               ? 'Create a new account to get started'
               : 'Enter your credentials to access your account'}
           </p>
         </div>
 
-        <div className="flex gap-2 justify-center">
+        <div className="flex gap-2 sm:gap-3 justify-center">
           <Button
             type="button"
             variant={!isSignUp ? 'default' : 'outline'}
@@ -127,6 +127,7 @@ export default function LoginPage() {
               resetForm()
             }}
             disabled={isLoading}
+            className="h-12 sm:h-11 px-6 sm:px-4"
           >
             Sign In
           </Button>
@@ -138,15 +139,16 @@ export default function LoginPage() {
               resetForm()
             }}
             disabled={isLoading}
+            className="h-12 sm:h-11 px-6 sm:px-4"
           >
             Create Account
           </Button>
         </div>
 
         {isSignUp ? (
-          <form onSubmit={handleSignUp} className="space-y-4">
+          <form onSubmit={handleSignUp} className="space-y-4 sm:space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="business_name">Business Name</Label>
+              <Label htmlFor="business_name" className="text-sm sm:text-base">Business Name</Label>
               <Input
                 id="business_name"
                 type="text"
@@ -156,11 +158,12 @@ export default function LoginPage() {
                 required
                 disabled={isLoading}
                 autoComplete="organization"
+                className="h-12 sm:h-11 text-base sm:text-sm"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="contact_name">Contact Name</Label>
+              <Label htmlFor="contact_name" className="text-sm sm:text-base">Contact Name</Label>
               <Input
                 id="contact_name"
                 type="text"
@@ -170,11 +173,12 @@ export default function LoginPage() {
                 required
                 disabled={isLoading}
                 autoComplete="name"
+                className="h-12 sm:h-11 text-base sm:text-sm"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="signup_email">Email</Label>
+              <Label htmlFor="signup_email" className="text-sm sm:text-base">Email</Label>
               <Input
                 id="signup_email"
                 type="email"
@@ -184,11 +188,12 @@ export default function LoginPage() {
                 required
                 disabled={isLoading}
                 autoComplete="email"
+                className="h-12 sm:h-11 text-base sm:text-sm"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="signup_phone">Phone</Label>
+              <Label htmlFor="signup_phone" className="text-sm sm:text-base">Phone</Label>
               <Input
                 id="signup_phone"
                 type="tel"
@@ -198,11 +203,12 @@ export default function LoginPage() {
                 required
                 disabled={isLoading}
                 autoComplete="tel"
+                className="h-12 sm:h-11 text-base sm:text-sm"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="signup_password">Password</Label>
+              <Label htmlFor="signup_password" className="text-sm sm:text-base">Password</Label>
               <Input
                 id="signup_password"
                 type="password"
@@ -213,30 +219,31 @@ export default function LoginPage() {
                 disabled={isLoading}
                 autoComplete="new-password"
                 minLength={8}
+                className="h-12 sm:h-11 text-base sm:text-sm"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 Password must be at least 8 characters
               </p>
             </div>
 
             {error && (
-              <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3">
+              <div className="text-sm sm:text-base text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3 sm:p-4">
                 {error}
               </div>
             )}
 
             <Button
               type="submit"
-              className="w-full"
+              className="w-full h-12 sm:h-11"
               disabled={isLoading}
             >
               {isLoading ? 'Creating account...' : 'Create Account'}
             </Button>
           </form>
         ) : (
-          <form onSubmit={handleLogin} className="space-y-6">
+          <form onSubmit={handleLogin} className="space-y-5 sm:space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-sm sm:text-base">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -246,11 +253,12 @@ export default function LoginPage() {
                 required
                 disabled={isLoading}
                 autoComplete="email"
+                className="h-12 sm:h-11 text-base sm:text-sm"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-sm sm:text-base">Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -260,18 +268,19 @@ export default function LoginPage() {
                 required
                 disabled={isLoading}
                 autoComplete="current-password"
+                className="h-12 sm:h-11 text-base sm:text-sm"
               />
             </div>
 
             {error && (
-              <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3">
+              <div className="text-sm sm:text-base text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3 sm:p-4">
                 {error}
               </div>
             )}
 
             <Button
               type="submit"
-              className="w-full"
+              className="w-full h-12 sm:h-11"
               disabled={isLoading}
             >
               {isLoading ? 'Signing in...' : 'Sign In'}

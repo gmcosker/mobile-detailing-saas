@@ -170,40 +170,40 @@ export default function CustomersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Customers</h1>
-          <p className="text-muted-foreground">Manage your customer database</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Customers</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Manage your customer database</p>
         </div>
         <Button 
-          className="w-full sm:w-auto"
+          className="w-full sm:w-auto h-12 sm:h-11"
           onClick={() => setIsAddCustomerOpen(true)}
         >
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-5 w-5 sm:h-4 sm:w-4 mr-2" />
           Add Customer
         </Button>
       </div>
 
       {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 sm:h-4 sm:w-4 text-muted-foreground" />
           <input
             type="text"
             placeholder="Search customers..."
-            className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full pl-10 sm:pl-10 pr-4 py-3 sm:py-2 border border-border rounded-lg bg-background text-base sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary min-h-[44px] sm:min-h-0"
           />
         </div>
-        <Button variant="outline">
-          <Filter className="h-4 w-4 mr-2" />
+        <Button variant="outline" className="h-12 sm:h-11 w-full sm:w-auto">
+          <Filter className="h-5 w-5 sm:h-4 sm:w-4 mr-2" />
           Filters
         </Button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         <StatCard
           title="Total Customers"
           value={customers.length.toString()}
@@ -286,14 +286,14 @@ function StatCard({
   }
 
   return (
-    <div className="bg-card border border-border rounded-lg p-4">
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-lg ${colorClasses[color]}`}>
-          <Icon className="h-4 w-4" />
+    <div className="bg-card border border-border rounded-lg p-3 sm:p-4">
+      <div className="flex items-center gap-2 sm:gap-3">
+        <div className={`p-2 sm:p-2.5 rounded-lg ${colorClasses[color]}`}>
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
         </div>
         <div>
-          <div className="text-2xl font-bold text-foreground">{value}</div>
-          <div className="text-sm text-muted-foreground">{title}</div>
+          <div className="text-xl sm:text-2xl font-bold text-foreground">{value}</div>
+          <div className="text-xs sm:text-sm text-muted-foreground">{title}</div>
         </div>
       </div>
     </div>
@@ -302,12 +302,12 @@ function StatCard({
 
 function CustomerRow({ customer }: { customer: any }) {
   return (
-    <div className="p-4 hover:bg-accent/50 transition-colors">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <h4 className="font-medium text-foreground">{customer.name}</h4>
-            <span className={`text-xs px-2 py-1 rounded-full ${
+    <div className="p-4 sm:p-5 hover:bg-accent/50 transition-colors min-h-[80px] sm:min-h-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 sm:gap-3 mb-2">
+            <h4 className="font-medium text-base sm:text-sm text-foreground truncate">{customer.name}</h4>
+            <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ${
               customer.status === 'active' 
                 ? 'text-green-600 bg-green-50 dark:bg-green-950 dark:text-green-400'
                 : 'text-gray-600 bg-gray-50 dark:bg-gray-950 dark:text-gray-400'
@@ -316,34 +316,36 @@ function CustomerRow({ customer }: { customer: any }) {
             </span>
           </div>
           
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <Phone className="h-3 w-3" />
-              {customer.phone}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+            <div className="flex items-center gap-1 truncate">
+              <Phone className="h-3.5 w-3.5 sm:h-3 sm:w-3 flex-shrink-0" />
+              <span className="truncate">{customer.phone}</span>
             </div>
             {customer.email && (
-              <div className="flex items-center gap-1">
-                <Mail className="h-3 w-3" />
-                {customer.email}
+              <div className="flex items-center gap-1 truncate">
+                <Mail className="h-3.5 w-3.5 sm:h-3 sm:w-3 flex-shrink-0" />
+                <span className="truncate">{customer.email}</span>
               </div>
             )}
             {customer.address && (
-              <div className="flex items-center gap-1">
-                <MapPin className="h-3 w-3" />
-                {customer.address}
+              <div className="flex items-center gap-1 truncate">
+                <MapPin className="h-3.5 w-3.5 sm:h-3 sm:w-3 flex-shrink-0" />
+                <span className="truncate">{customer.address}</span>
               </div>
             )}
           </div>
         </div>
         
-        <div className="text-right">
-          <div className="font-medium text-foreground">${customer.totalSpent}</div>
-          <div className="text-sm text-muted-foreground">Last: {customer.lastVisit}</div>
+        <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-0">
+          <div className="text-left sm:text-right">
+            <div className="font-medium text-base sm:text-sm text-foreground">${customer.totalSpent}</div>
+            <div className="text-xs sm:text-sm text-muted-foreground">Last: {customer.lastVisit}</div>
+          </div>
+          
+          <Button variant="ghost" size="icon" className="h-11 w-11 sm:h-10 sm:w-10 flex-shrink-0">
+            <MoreHorizontal className="h-5 w-5 sm:h-4 sm:w-4" />
+          </Button>
         </div>
-        
-        <Button variant="ghost" size="icon">
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
       </div>
     </div>
   )
@@ -420,19 +422,20 @@ function AddCustomerModal({ isOpen, onClose, onSave, isLoading }: AddCustomerMod
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 sm:p-6 z-50">
       <div className="bg-card border border-border rounded-lg shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-foreground">Add New Customer</h2>
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h2 className="text-lg sm:text-xl font-semibold text-foreground">Add New Customer</h2>
             <Button
               variant="ghost"
               size="icon"
               onClick={onClose}
               disabled={isLoading}
+              className="h-11 w-11 sm:h-10 sm:w-10"
             >
-              <X className="h-5 w-5" />
+              <X className="h-6 w-6 sm:h-5 sm:w-5" />
             </Button>
           </div>
 
@@ -440,7 +443,7 @@ function AddCustomerModal({ isOpen, onClose, onSave, isLoading }: AddCustomerMod
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Name */}
             <div className="space-y-2">
-              <Label htmlFor="name">Name *</Label>
+              <Label htmlFor="name" className="text-sm sm:text-base">Name *</Label>
               <Input
                 id="name"
                 type="text"
@@ -449,12 +452,13 @@ function AddCustomerModal({ isOpen, onClose, onSave, isLoading }: AddCustomerMod
                 placeholder="John Doe"
                 required
                 disabled={isLoading}
+                className="h-12 sm:h-11 text-base sm:text-sm"
               />
             </div>
 
             {/* Phone */}
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone *</Label>
+              <Label htmlFor="phone" className="text-sm sm:text-base">Phone *</Label>
               <Input
                 id="phone"
                 type="tel"
@@ -463,12 +467,13 @@ function AddCustomerModal({ isOpen, onClose, onSave, isLoading }: AddCustomerMod
                 placeholder="555-123-4567"
                 required
                 disabled={isLoading}
+                className="h-12 sm:h-11 text-base sm:text-sm"
               />
             </div>
 
             {/* Email */}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-sm sm:text-base">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -476,12 +481,13 @@ function AddCustomerModal({ isOpen, onClose, onSave, isLoading }: AddCustomerMod
                 onChange={(e) => handleInputChange('email', e.target.value)}
                 placeholder="john@example.com"
                 disabled={isLoading}
+                className="h-12 sm:h-11 text-base sm:text-sm"
               />
             </div>
 
             {/* Address */}
             <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
+              <Label htmlFor="address" className="text-sm sm:text-base">Address</Label>
               <Input
                 id="address"
                 type="text"
@@ -489,35 +495,36 @@ function AddCustomerModal({ isOpen, onClose, onSave, isLoading }: AddCustomerMod
                 onChange={(e) => handleInputChange('address', e.target.value)}
                 placeholder="123 Main St, City, State 12345"
                 disabled={isLoading}
+                className="h-12 sm:h-11 text-base sm:text-sm"
               />
             </div>
 
             {/* Notes */}
             <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
+              <Label htmlFor="notes" className="text-sm sm:text-base">Notes</Label>
               <textarea
                 id="notes"
                 value={formData.notes}
                 onChange={(e) => handleInputChange('notes', e.target.value)}
                 placeholder="Additional notes about this customer..."
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex min-h-[100px] sm:min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={isLoading}
                 rows={3}
               />
             </div>
 
             {error && (
-              <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3">
+              <div className="text-sm sm:text-base text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-3 sm:p-4">
                 {error}
               </div>
             )}
 
             {/* Actions */}
-            <div className="flex gap-3 pt-4">
+            <div className="flex flex-col sm:flex-row gap-3 pt-4">
               <Button
                 type="button"
                 variant="outline"
-                className="flex-1"
+                className="flex-1 h-12 sm:h-11 w-full sm:w-auto order-2 sm:order-1"
                 onClick={onClose}
                 disabled={isLoading}
               >
@@ -525,7 +532,7 @@ function AddCustomerModal({ isOpen, onClose, onSave, isLoading }: AddCustomerMod
               </Button>
               <Button
                 type="submit"
-                className="flex-1"
+                className="flex-1 h-12 sm:h-11 w-full sm:w-auto order-1 sm:order-2"
                 disabled={isLoading}
               >
                 {isLoading ? 'Saving...' : 'Save Customer'}

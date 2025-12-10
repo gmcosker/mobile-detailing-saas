@@ -79,31 +79,32 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
   return (
     <div className="min-h-screen bg-background">
       {/* Mobile Header */}
-      <header className="sticky top-0 z-50 bg-card border-b border-border px-4 py-3">
+      <header className="sticky top-0 z-50 bg-card border-b border-border px-4 sm:px-6 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="md:hidden">
-              <Menu className="h-5 w-5" />
+            <Button variant="ghost" size="icon" className="md:hidden h-12 w-12">
+              <Menu className="h-6 w-6" />
             </Button>
-            <h1 className="text-lg font-semibold text-foreground">{title}</h1>
+            <h1 className="text-lg sm:text-xl font-semibold text-foreground">{title}</h1>
           </div>
           
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon">
-              <Bell className="h-5 w-5" />
+            <Button variant="ghost" size="icon" className="h-12 w-12 sm:h-11 sm:w-11">
+              <Bell className="h-6 w-6 sm:h-5 sm:w-5" />
             </Button>
-            <Button variant="ghost" size="icon" asChild>
+            <Button variant="ghost" size="icon" className="h-12 w-12 sm:h-11 sm:w-11" asChild>
               <a href="/branding">
-                <Settings className="h-5 w-5" />
+                <Settings className="h-6 w-6 sm:h-5 sm:w-5" />
               </a>
             </Button>
             <Button 
               variant="ghost" 
               size="icon"
+              className="h-12 w-12 sm:h-11 sm:w-11"
               onClick={handleSignOut}
               title="Sign Out"
             >
-              <LogOut className="h-5 w-5" />
+              <LogOut className="h-6 w-6 sm:h-5 sm:w-5" />
             </Button>
           </div>
         </div>
@@ -140,14 +141,14 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
       </aside>
 
       {/* Main Content with proper offset */}
-      <main className={`flex-1 ${title === "Dashboard" ? "md:ml-64" : "md:ml-64"}`}>
-        <div className="p-6">
+      <main className={`flex-1 ${title === "Dashboard" ? "md:ml-64" : "md:ml-64"} pb-20 md:pb-6`}>
+        <div className="p-4 sm:p-6">
           {children}
         </div>
       </main>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border md:hidden z-50">
+      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t border-border md:hidden z-50 safe-area-bottom">
         <div className="grid grid-cols-5 gap-1 p-2">
           <NavButton icon={Calendar} label="Schedule" href="/dashboard" active={activePage === '/dashboard'} />
           <NavButton icon={Users} label="Customers" href="/customers" active={activePage === '/customers'} />
@@ -175,13 +176,13 @@ function NavButton({
   return (
     <Component 
       href={href}
-      className={`flex flex-col items-center gap-1 p-2 rounded-lg transition-colors ${
+      className={`flex flex-col items-center justify-center gap-1 min-h-[60px] p-3 rounded-lg transition-colors ${
         active 
           ? 'bg-primary text-primary-foreground' 
           : 'text-muted-foreground hover:text-foreground hover:bg-accent'
       }`}
     >
-      <Icon className="h-5 w-5" />
+      <Icon className="h-6 w-6" />
       <span className="text-xs font-medium">{label}</span>
     </Component>
   )
@@ -202,7 +203,7 @@ function SidebarButton({
   return (
     <Component 
       href={href}
-      className={`flex items-center gap-3 w-full p-3 rounded-lg transition-colors ${
+      className={`flex items-center gap-3 w-full min-h-[44px] p-3 rounded-lg transition-colors ${
         active 
           ? 'bg-primary text-primary-foreground' 
           : 'text-muted-foreground hover:text-foreground hover:bg-accent'
