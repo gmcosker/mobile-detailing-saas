@@ -46,6 +46,41 @@ export const detailerService = {
     }
     
     return data
+  },
+
+  async update(detailerId: string, updates: Partial<Tables['detailers']['Update']>): Promise<boolean> {
+    const supabase = getSupabaseClient()
+    if (!supabase) return false
+    
+    // Resolve UUID if detailerId is a string (detailer_id)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(detailerId)
+    let uuid = detailerId
+    
+    if (!isUuid) {
+      const { data: detailer } = await supabase
+        .from('detailers')
+        .select('id')
+        .eq('detailer_id', detailerId)
+        .single()
+      
+      if (!detailer) return false
+      uuid = detailer.id
+    }
+    
+    const { error } = await supabase
+      .from('detailers')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', uuid)
+    
+    if (error) {
+      console.error('Error updating detailer:', error)
+      return false
+    }
+    
+    return true
   }
 }
 

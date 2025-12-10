@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAuth } from '@/lib/auth'
 import { customerService, appointmentService } from '@/lib/database'
+import { checkSubscriptionAccess } from '@/lib/subscription-middleware'
 
 // GET /api/customers - List customers for a detailer
 export async function GET(request: NextRequest) {
@@ -26,6 +27,12 @@ export async function GET(request: NextRequest) {
         { success: false, error: 'Forbidden' },
         { status: 403 }
       )
+    }
+
+    // Check subscription access
+    const subscriptionCheck = await checkSubscriptionAccess(auth.detailerId)
+    if (subscriptionCheck) {
+      return subscriptionCheck
     }
 
     // Get customers filtered by detailer through appointments

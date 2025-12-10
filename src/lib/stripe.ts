@@ -353,6 +353,162 @@ export const connectService = {
   }
 }
 
+// Subscription service for managing recurring subscriptions
+export const subscriptionService = {
+  // Create or retrieve a Stripe Customer for subscriptions
+  async createCustomer(email: string, name: string, metadata?: Record<string, string>): Promise<Stripe.Customer | null> {
+    const stripeInstance = getStripeInstance()
+    if (!stripeInstance) {
+      console.log('🎭 Demo mode: Cannot create Stripe customer')
+      return null
+    }
+
+    try {
+      // Try to find existing customer by email
+      const existingCustomers = await stripeInstance.customers.list({
+        email,
+        limit: 1,
+      })
+
+      if (existingCustomers.data.length > 0) {
+        return existingCustomers.data[0]
+      }
+
+      // Create new customer
+      const customer = await stripeInstance.customers.create({
+        email,
+        name,
+        metadata: {
+          source: 'detailflow_subscription',
+          ...metadata,
+        },
+      })
+
+      return customer
+    } catch (error) {
+      console.error('Error creating/getting Stripe customer:', error)
+      return null
+    }
+  },
+
+  // Create Checkout Session for subscription
+  async createCheckoutSession(
+    customerId: string,
+    priceId: string,
+    detailerId: string,
+    successUrl: string,
+    cancelUrl: string
+  ): Promise<Stripe.Checkout.Session | null> {
+    const stripeInstance = getStripeInstance()
+    if (!stripeInstance) {
+      console.log('🎭 Demo mode: Cannot create checkout session')
+      return null
+    }
+
+    try {
+      const session = await stripeInstance.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+        mode: 'subscription',
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        metadata: {
+          detailer_id: detailerId,
+        },
+        subscription_data: {
+          metadata: {
+            detailer_id: detailerId,
+          },
+        },
+      })
+
+      return session
+    } catch (error) {
+      console.error('Error creating checkout session:', error)
+      return null
+    }
+  },
+
+  // Get subscription by ID
+  async getSubscription(subscriptionId: string): Promise<Stripe.Subscription | null> {
+    const stripeInstance = getStripeInstance()
+    if (!stripeInstance) {
+      console.log('🎭 Demo mode: Cannot get subscription')
+      return null
+    }
+
+    try {
+      const subscription = await stripeInstance.subscriptions.retrieve(subscriptionId)
+      return subscription
+    } catch (error) {
+      console.error('Error retrieving subscription:', error)
+      return null
+    }
+  },
+
+  // Cancel subscription
+  async cancelSubscription(subscriptionId: string, immediately: boolean = false): Promise<boolean> {
+    const stripeInstance = getStripeInstance()
+    if (!stripeInstance) {
+      console.log('🎭 Demo mode: Cannot cancel subscription')
+      return false
+    }
+
+    try {
+      if (immediately) {
+        await stripeInstance.subscriptions.cancel(subscriptionId)
+      } else {
+        // Cancel at period end
+        await stripeInstance.subscriptions.update(subscriptionId, {
+          cancel_at_period_end: true,
+        })
+      }
+      return true
+    } catch (error) {
+      console.error('Error canceling subscription:', error)
+      return false
+    }
+  },
+
+  // Update subscription (change plan)
+  async updateSubscription(
+    subscriptionId: string,
+    newPriceId: string
+  ): Promise<Stripe.Subscription | null> {
+    const stripeInstance = getStripeInstance()
+    if (!stripeInstance) {
+      console.log('🎭 Demo mode: Cannot update subscription')
+      return null
+    }
+
+    try {
+      const subscription = await stripeInstance.subscriptions.retrieve(subscriptionId)
+      
+      // Update subscription with new price
+      const updated = await stripeInstance.subscriptions.update(subscriptionId, {
+        items: [
+          {
+            id: subscription.items.data[0].id,
+            price: newPriceId,
+          },
+        ],
+        proration_behavior: 'create_prorations',
+      })
+
+      return updated
+    } catch (error) {
+      console.error('Error updating subscription:', error)
+      return null
+    }
+  },
+}
+
 export default stripe
 
 

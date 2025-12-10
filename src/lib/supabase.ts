@@ -37,6 +37,13 @@ export type Database = {
           detailer_id: string // unique identifier for booking links
           stripe_account_id: string | null
           is_active: boolean
+          trial_started_at: string | null
+          trial_ends_at: string | null
+          subscription_status: 'trial' | 'active' | 'expired' | 'cancelled' | null
+          stripe_subscription_id: string | null
+          stripe_customer_id: string | null
+          subscription_plan: 'starter' | 'professional' | 'business' | null
+          subscription_ends_at: string | null
         }
         Insert: {
           id?: string
@@ -49,6 +56,13 @@ export type Database = {
           detailer_id: string
           stripe_account_id?: string | null
           is_active?: boolean
+          trial_started_at?: string | null
+          trial_ends_at?: string | null
+          subscription_status?: 'trial' | 'active' | 'expired' | 'cancelled'
+          stripe_subscription_id?: string | null
+          stripe_customer_id?: string | null
+          subscription_plan?: 'starter' | 'professional' | 'business'
+          subscription_ends_at?: string | null
         }
         Update: {
           id?: string
@@ -61,6 +75,13 @@ export type Database = {
           detailer_id?: string
           stripe_account_id?: string | null
           is_active?: boolean
+          trial_started_at?: string | null
+          trial_ends_at?: string | null
+          subscription_status?: 'trial' | 'active' | 'expired' | 'cancelled'
+          stripe_subscription_id?: string | null
+          stripe_customer_id?: string | null
+          subscription_plan?: 'starter' | 'professional' | 'business' | null
+          subscription_ends_at?: string | null
         }
       }
       customers: {

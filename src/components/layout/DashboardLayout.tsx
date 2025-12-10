@@ -1,6 +1,6 @@
 'use client'
 
-import { ReactNode } from 'react'
+import { ReactNode, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { 
@@ -15,6 +15,8 @@ import {
   Tag,
   LogOut
 } from 'lucide-react'
+import PaywallModal from '@/components/subscription/PaywallModal'
+import { checkSubscriptionStatus, hasActiveAccess } from '@/lib/subscription'
 
 interface DashboardLayoutProps {
   children: ReactNode
@@ -23,6 +25,51 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children, title = "Dashboard" }: DashboardLayoutProps) {
   const router = useRouter()
+  const [detailerId, setDetailerId] = useState<string | null>(null)
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null)
+  const [showPaywall, setShowPaywall] = useState(false)
+  const [isChecking, setIsChecking] = useState(true)
+
+  useEffect(() => {
+    const checkSubscription = async () => {
+      try {
+        const token = localStorage.getItem('auth_token')
+        if (!token) {
+          router.push('/login')
+          return
+        }
+
+        const response = await fetch('/api/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.success && data.user?.detailer_id) {
+            const id = data.user.detailer_id
+            setDetailerId(id)
+
+            // Check subscription status
+            const subscription = await checkSubscriptionStatus(id)
+            setSubscriptionStatus(subscription.status)
+
+            // Show paywall if expired
+            if (subscription.status === 'expired') {
+              setShowPaywall(true)
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error checking subscription:', error)
+      } finally {
+        setIsChecking(false)
+      }
+    }
+
+    checkSubscription()
+  }, [router])
 
   // Determine which page is active based on the title
   const getActivePage = () => {
@@ -76,8 +123,32 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
     }
   }
 
+  // Show loading while checking subscription
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Paywall Modal - shows if subscription is expired */}
+      {showPaywall && detailerId && (
+        <PaywallModal 
+          detailerId={detailerId} 
+          onClose={() => {
+            // Don't allow closing if expired - user must upgrade
+            if (subscriptionStatus === 'expired') {
+              return
+            }
+            setShowPaywall(false)
+          }}
+        />
+      )}
       {/* Mobile Header */}
       <header className="sticky top-0 z-50 bg-card border-b border-border px-4 sm:px-6 py-3">
         <div className="flex items-center justify-between">

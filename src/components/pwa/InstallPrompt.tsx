@@ -14,11 +14,27 @@ export default function InstallPrompt() {
   const [showPrompt, setShowPrompt] = useState(false)
   const [isIOS, setIsIOS] = useState(false)
   const [isStandalone, setIsStandalone] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
     // Check if already installed
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsStandalone(true)
+      return
+    }
+
+    // Detect mobile device (phones and tablets)
+    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera
+    const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase())
+    // Also check for touch capability and screen size as additional indicators
+    const hasTouchScreen = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+    const isSmallScreen = window.innerWidth <= 768
+    
+    const isMobileUser = isMobileDevice || (hasTouchScreen && isSmallScreen)
+    setIsMobile(isMobileUser)
+
+    // Don't show prompt on desktop
+    if (!isMobileUser) {
       return
     }
 
@@ -88,8 +104,8 @@ export default function InstallPrompt() {
     localStorage.setItem('pwa-install-prompt-seen', 'true')
   }
 
-  // Don't show if already installed
-  if (isStandalone || !showPrompt) {
+  // Don't show if already installed, not on mobile, or prompt not ready
+  if (isStandalone || !isMobile || !showPrompt) {
     return null
   }
 

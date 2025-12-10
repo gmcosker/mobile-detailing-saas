@@ -14,6 +14,7 @@ import {
   Car,
   Loader2
 } from 'lucide-react'
+import TrialBanner from '@/components/subscription/TrialBanner'
 
 // Real data types
 interface DashboardStats {
@@ -200,6 +201,9 @@ export default function DashboardHome() {
             <p className="text-base sm:text-lg md:text-xl text-gray-600">Here's what's happening with your business today.</p>
           </div>
         </div>
+
+        {/* Trial Banner */}
+        {detailerId && <TrialBanner detailerId={detailerId} />}
 
         {/* Quick Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">

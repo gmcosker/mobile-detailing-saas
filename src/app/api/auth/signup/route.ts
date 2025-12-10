@@ -195,6 +195,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Set trial dates for new accounts (14-day free trial)
+    const trialStartedAt = new Date().toISOString()
+    const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // 14 days from now
+    
+    const trialUpdated = await detailerService.update(detailer.id, {
+      trial_started_at: trialStartedAt,
+      trial_ends_at: trialEndsAt,
+      subscription_status: 'trial'
+    })
+
+    if (!trialUpdated) {
+      console.warn('Failed to set trial dates for detailer:', detailer.id)
+      // Don't fail signup if trial update fails - account is still created
+    }
+
     // Return user info and session token
     return NextResponse.json({
       success: true,
