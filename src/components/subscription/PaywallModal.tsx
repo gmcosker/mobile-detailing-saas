@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Lock, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -76,6 +77,12 @@ export default function PaywallModal({ detailerId, onClose }: PaywallModalProps)
   } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isProcessing, setIsProcessing] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+    return () => setMounted(false)
+  }, [])
 
   useEffect(() => {
     const fetchSubscription = async () => {
@@ -99,6 +106,8 @@ export default function PaywallModal({ detailerId, onClose }: PaywallModalProps)
     if (onClose) onClose()
     return null
   }
+
+  if (!mounted) return null
 
   const handleSelectPlan = async (planId: string) => {
     setIsProcessing(planId)
@@ -132,9 +141,9 @@ export default function PaywallModal({ detailerId, onClose }: PaywallModalProps)
     }
   }
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div className="bg-background rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+  const modalContent = (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4" style={{ zIndex: 99999 }}>
+      <div className="bg-background rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto mx-auto my-auto">
         {/* Header */}
         <div className="sticky top-0 bg-background border-b border-border px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -258,5 +267,7 @@ export default function PaywallModal({ detailerId, onClose }: PaywallModalProps)
       </div>
     </div>
   )
+
+  return createPortal(modalContent, document.body)
 }
 
