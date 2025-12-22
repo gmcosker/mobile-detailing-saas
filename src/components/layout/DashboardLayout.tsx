@@ -199,6 +199,7 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
             Mobile Detailing
           </h2>
           
+          {/* Navigation menu with Upgrade link */}
           <nav className="space-y-2">
             <SidebarButton icon={Calendar} label="Schedule" href="/dashboard" active={activePage === '/dashboard'} />
             <SidebarButton icon={Users} label="Customers" href="/customers" active={activePage === '/customers'} />
