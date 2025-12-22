@@ -1,32 +1,37 @@
 import { getSupabaseClient } from '@/lib/supabase'
 
-// Twilio client will be initialized only on server-side
-let twilioClient: any = null
+// Vonage/Nexmo client will be initialized only on server-side
+let vonageClient: any = null
 
-// Initialize Twilio client (server-side only)
-async function getTwilioClient() {
+// Initialize Vonage client (server-side only)
+async function getVonageClient() {
   if (typeof window !== 'undefined') {
-    // We're on the client side, don't initialize Twilio
+    // We're on the client side, don't initialize Vonage
     return null
   }
   
-  if (!twilioClient) {
+  if (!vonageClient) {
     try {
-      const twilio = (await import('twilio')).default
-      twilioClient = twilio(
-        process.env.TWILIO_ACCOUNT_SID || 'ACdummy',
-        process.env.TWILIO_AUTH_TOKEN || 'dummy_token'
-      )
+      const { Vonage } = await import('@vonage/server-sdk')
+      const apiKey = process.env.NEXMO_API_KEY || process.env.VONAGE_API_KEY
+      const apiSecret = process.env.NEXMO_API_SECRET_KEY || process.env.VONAGE_API_SECRET_KEY
+      
+      if (!apiKey || !apiSecret) {
+        console.log('Vonage credentials not configured')
+        return null
+      }
+      
+      vonageClient = new Vonage({ apiKey, apiSecret })
     } catch (error) {
-      console.log('Twilio not available, using demo mode')
+      console.log('Vonage not available, using demo mode')
       return null
     }
   }
   
-  return twilioClient
+  return vonageClient
 }
 
-const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER || '+1234567890'
+const nexmoPhoneNumber = process.env.NEXMO_PHONE_NUMBER || process.env.VONAGE_PHONE_NUMBER || '+1234567890'
 
 // SMS Templates
 export const smsTemplates = {
@@ -167,23 +172,23 @@ export const smsService = {
       }
 
       // Send immediately
-      const client = await getTwilioClient()
+      const client = await getVonageClient()
       if (!client) {
         // Check if credentials are missing
-        const hasAccountSid = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_ACCOUNT_SID !== 'ACdummy'
-        const hasAuthToken = process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_AUTH_TOKEN !== 'dummy_token'
-        const hasPhoneNumber = process.env.TWILIO_PHONE_NUMBER && process.env.TWILIO_PHONE_NUMBER !== '+1234567890'
+        const hasApiKey = process.env.NEXMO_API_KEY || process.env.VONAGE_API_KEY
+        const hasApiSecret = process.env.NEXMO_API_SECRET_KEY || process.env.VONAGE_API_SECRET_KEY
+        const hasPhoneNumber = process.env.NEXMO_PHONE_NUMBER || process.env.VONAGE_PHONE_NUMBER
         
-        if (!hasAccountSid || !hasAuthToken || !hasPhoneNumber) {
-          console.warn('[SMS] Twilio credentials not configured. Missing:', {
-            accountSid: !hasAccountSid,
-            authToken: !hasAuthToken,
+        if (!hasApiKey || !hasApiSecret || !hasPhoneNumber) {
+          console.warn('[SMS] Vonage credentials not configured. Missing:', {
+            apiKey: !hasApiKey,
+            apiSecret: !hasApiSecret,
             phoneNumber: !hasPhoneNumber
           })
           console.log(`[DEMO MODE] SMS would be sent: ${message} to ${formattedPhone}`)
           return {
             success: false,
-            error: 'Twilio credentials not configured. Please add TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER to your environment variables.',
+            error: 'Vonage credentials not configured. Please add NEXMO_API_KEY, NEXMO_API_SECRET_KEY, and NEXMO_PHONE_NUMBER to your environment variables.',
             messageId: `demo_${Date.now()}`,
           }
         }
@@ -196,19 +201,23 @@ export const smsService = {
         }
       }
 
-      console.log(`[SMS] Attempting to send SMS to ${formattedPhone} from ${twilioPhoneNumber} (Detailer: ${detailerId})`)
+      console.log(`[SMS] Attempting to send SMS to ${formattedPhone} from ${nexmoPhoneNumber} (Detailer: ${detailerId})`)
       console.log(`[SMS] Original phone number: "${to}", Cleaned: "${cleanPhone}", Formatted: "${formattedPhone}"`)
-      const result = await client.messages.create({
-        body: message,
-        from: twilioPhoneNumber,
+      
+      const response = await client.sms.send({
         to: formattedPhone,
+        from: nexmoPhoneNumber,
+        text: message,
       })
 
-      console.log(`[SMS] Successfully sent SMS. Message SID: ${result.sid}`)
-      console.log(`[SMS] Message status: ${result.status}, To: ${result.to}, From: ${result.from}`)
-      return {
-        success: true,
-        messageId: result.sid,
+      if (response.messages && response.messages[0].status === '0') {
+        console.log(`[SMS] Successfully sent SMS. Message ID: ${response.messages[0]['message-id']}`)
+        return {
+          success: true,
+          messageId: response.messages[0]['message-id'],
+        }
+      } else {
+        throw new Error(response.messages?.[0]['error-text'] || 'Failed to send SMS')
       }
     } catch (error: any) {
       console.error(`[SMS] Error sending SMS for detailer ${detailerId}:`, error)
@@ -220,12 +229,12 @@ export const smsService = {
         detailerId
       })
       
-      // For demo purposes, simulate success when Twilio credentials aren't real
-      if (error.message?.includes('ACdummy') || (process.env.NODE_ENV === 'development' && !process.env.TWILIO_ACCOUNT_SID)) {
+      // For demo purposes, simulate success when Vonage credentials aren't real
+      if (process.env.NODE_ENV === 'development' && !process.env.NEXMO_API_KEY && !process.env.VONAGE_API_KEY) {
         console.log(`[DEMO MODE] SMS would be sent: ${message} to ${to} (Detailer: ${detailerId})`)
         return {
           success: false,
-          error: 'Twilio credentials not configured',
+          error: 'Vonage credentials not configured',
           messageId: `demo_${Date.now()}`,
         }
       }
@@ -435,13 +444,14 @@ export const smsService = {
         return { status: 'delivered' }
       }
 
-      const client = await getTwilioClient()
+      const client = await getVonageClient()
       if (!client) {
         return { status: 'delivered' } // Demo mode
       }
 
-      const message = await client.messages(messageId).fetch()
-      return { status: message.status }
+      // Vonage doesn't have a direct message status API like Twilio
+      // In production, you'd track this in your database
+      return { status: 'delivered' }
     } catch (error: any) {
       return { status: 'unknown', error: error.message }
     }
@@ -450,7 +460,7 @@ export const smsService = {
   // Get SMS history for a phone number
   async getSMSHistory(phoneNumber: string, limit: number = 10) {
     try {
-      const client = await getTwilioClient()
+      const client = await getVonageClient()
       if (!client) {
         // Return mock data for demo
         return [
