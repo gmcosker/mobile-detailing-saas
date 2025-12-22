@@ -10,32 +10,27 @@ export async function GET(
   try {
     // In Next.js 15+, params is a Promise that needs to be awaited
     const { detailerId } = await params
-    console.log('Looking for detailer with detailer_id:', detailerId)
+    
+    if (!detailerId || typeof detailerId !== 'string' || detailerId.trim().length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid detailer ID' },
+        { status: 400 }
+      )
+    }
     
     // Verify detailer exists and is active
-    const detailer = await detailerService.getByDetailerId(detailerId)
+    const detailer = await detailerService.getByDetailerId(detailerId.trim())
     
     if (!detailer) {
-      console.error('Detailer not found for detailer_id:', detailerId)
-      // Try to find any detailers to help debug
-      const supabase = (await import('@/lib/supabase')).getSupabaseClient()
-      if (supabase) {
-        const { data: allDetailers } = await supabase
-          .from('detailers')
-          .select('detailer_id, business_name, is_active')
-          .limit(10)
-        console.log('Available detailers:', allDetailers)
-      }
       return NextResponse.json(
-        { success: false, error: `Detailer not found. Searched for detailer_id: "${detailerId}"` },
+        { success: false, error: 'Booking page not found. Please check your booking link.' },
         { status: 404 }
       )
     }
     
     if (!detailer.is_active) {
-      console.error('Detailer found but inactive:', detailerId)
       return NextResponse.json(
-        { success: false, error: 'Detailer account is inactive' },
+        { success: false, error: 'This booking page is currently unavailable.' },
         { status: 403 }
       )
     }
@@ -45,41 +40,7 @@ export async function GET(
 
     // Get services for this detailer (only active ones)
     // Use service role key to bypass RLS since this is a public endpoint
-    console.log('=== BOOKING INFO DEBUG ===')
-    console.log('Fetching services for detailer_id:', detailerId)
-    console.log('Detailer found:', detailer.id, detailer.detailer_id)
-    
     const services = await serviceService.getByDetailerId(detailerId, true)
-    console.log('Found services:', services?.length || 0, services)
-    
-    // Additional debug: Check if services exist in database
-    if (services.length === 0) {
-      const supabase = (await import('@/lib/supabase')).getSupabaseClient()
-      if (supabase) {
-        const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-        if (serviceRoleKey) {
-          const { createClient } = await import('@supabase/supabase-js')
-          const adminSupabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey)
-          
-          // Check all services for this detailer (including inactive)
-          const { data: allServices, error: allError } = await adminSupabase
-            .from('services')
-            .select('*')
-            .eq('detailer_id', detailer.id)
-          
-          console.log('All services (including inactive) for detailer UUID:', detailer.id, ':', allServices?.length || 0)
-          if (allServices && allServices.length > 0) {
-            console.log('Services found:', allServices.map(s => ({ 
-              id: s.id, 
-              name: s.name, 
-              is_active: s.is_active,
-              detailer_id: s.detailer_id 
-            })))
-          }
-        }
-      }
-    }
-    console.log('=== END BOOKING INFO DEBUG ===')
 
     // Get query parameters for booked slots
     const { searchParams } = new URL(request.url)
@@ -88,11 +49,16 @@ export async function GET(
 
     let bookedSlots: { date: string, time: string }[] = []
     if (startDate && endDate) {
-      bookedSlots = await appointmentService.getBookedSlots(
-        detailerId,
-        startDate,
-        endDate
-      )
+      try {
+        bookedSlots = await appointmentService.getBookedSlots(
+          detailerId,
+          startDate,
+          endDate
+        )
+      } catch (slotError) {
+        // Log error but don't fail the entire request - booked slots are not critical
+        console.error('Error fetching booked slots:', slotError)
+      }
     }
 
     return NextResponse.json({
@@ -107,7 +73,7 @@ export async function GET(
       },
       branding: branding || null,
       services: services || [],
-      bookedSlots
+      bookedSlots: bookedSlots || []
     })
 
   } catch (error) {

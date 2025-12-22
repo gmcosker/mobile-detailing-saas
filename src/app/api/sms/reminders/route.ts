@@ -36,7 +36,8 @@ export async function POST(request: NextRequest) {
           appointment.service_type,
           appointment.scheduled_date,
           appointment.scheduled_time,
-          detailer.business_name
+          detailer.business_name,
+          detailer.id
         )
 
         if (result.success) {

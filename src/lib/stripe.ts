@@ -4,7 +4,7 @@ import { loadStripe } from '@stripe/stripe-js'
 // Server-side Stripe instance
 let stripe: Stripe | null = null
 
-function getStripeInstance(): Stripe | null {
+export function getStripeInstance(): Stripe | null {
   if (!stripe) {
     const secretKey = process.env.STRIPE_SECRET_KEY
     if (!secretKey || secretKey.includes('your_stripe') || secretKey === 'sk_test_dummy') {
@@ -40,7 +40,8 @@ export const paymentService = {
     amount: number, 
     currency: string = 'usd',
     applicationFeeAmount?: number,
-    stripeAccountId?: string
+    stripeAccountId?: string,
+    metadata?: Record<string, string>
   ): Promise<Stripe.PaymentIntent | null> {
     const stripeInstance = getStripeInstance()
     
@@ -73,6 +74,7 @@ export const paymentService = {
         } : undefined,
         metadata: {
           type: 'mobile_detailing_service',
+          ...metadata,
         },
       })
 
@@ -293,8 +295,15 @@ export const connectService = {
     email: string,
     country: string = 'US'
   ): Promise<Stripe.Account | null> {
+    const stripeInstance = getStripeInstance()
+    
+    if (!stripeInstance) {
+      console.warn('[STRIPE] Stripe not configured, skipping Connect account creation')
+      return null
+    }
+
     try {
-      const account = await stripe.accounts.create({
+      const account = await stripeInstance.accounts.create({
         type: 'express',
         country,
         email,
@@ -308,26 +317,34 @@ export const connectService = {
         },
       })
 
+      console.log(`[STRIPE] Created Connect account: ${account.id} for ${email}`)
       return account
-    } catch (error) {
-      console.error('Error creating Connect account:', error)
+    } catch (error: any) {
+      console.error('[STRIPE] Error creating Connect account:', error.message)
       return null
     }
   },
 
   // Create an onboarding link
   async createOnboardingLink(accountId: string): Promise<string | null> {
+    const stripeInstance = getStripeInstance()
+    
+    if (!stripeInstance) {
+      console.warn('[STRIPE] Stripe not configured, cannot create onboarding link')
+      return null
+    }
+
     try {
-      const accountLink = await stripe.accountLinks.create({
+      const accountLink = await stripeInstance.accountLinks.create({
         account: accountId,
-        refresh_url: `${process.env.NEXT_PUBLIC_APP_URL}/onboarding/refresh`,
-        return_url: `${process.env.NEXT_PUBLIC_APP_URL}/onboarding/complete`,
+        refresh_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/onboarding/refresh`,
+        return_url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/onboarding/complete`,
         type: 'account_onboarding',
       })
 
       return accountLink.url
-    } catch (error) {
-      console.error('Error creating onboarding link:', error)
+    } catch (error: any) {
+      console.error('[STRIPE] Error creating onboarding link:', error.message)
       return null
     }
   },
@@ -338,16 +355,22 @@ export const connectService = {
     chargesEnabled: boolean
     payoutsEnabled: boolean
   } | null> {
+    const stripeInstance = getStripeInstance()
+    
+    if (!stripeInstance) {
+      return null
+    }
+
     try {
-      const account = await stripe.accounts.retrieve(accountId)
+      const account = await stripeInstance.accounts.retrieve(accountId)
       
       return {
         detailsSubmitted: account.details_submitted || false,
         chargesEnabled: account.charges_enabled || false,
         payoutsEnabled: account.payouts_enabled || false,
       }
-    } catch (error) {
-      console.error('Error getting account status:', error)
+    } catch (error: any) {
+      console.error('[STRIPE] Error getting account status:', error.message)
       return null
     }
   }
@@ -393,21 +416,25 @@ export const subscriptionService = {
 
   // Create Checkout Session for subscription
   async createCheckoutSession(
-    customerId: string,
+    customerId: string | undefined,
     priceId: string,
     detailerId: string,
     successUrl: string,
-    cancelUrl: string
+    cancelUrl: string,
+    customerEmail?: string
   ): Promise<Stripe.Checkout.Session | null> {
     const stripeInstance = getStripeInstance()
     if (!stripeInstance) {
-      console.log('🎭 Demo mode: Cannot create checkout session')
+      console.error('❌ Stripe not configured - Cannot create checkout session')
+      console.error('Check STRIPE_SECRET_KEY environment variable')
       return null
     }
 
     try {
-      const session = await stripeInstance.checkout.sessions.create({
-        customer: customerId,
+      console.log('Creating checkout session with:', { customerId: customerId || 'NEW', priceId, detailerId })
+      
+      // Build session params - use customer ID if available, otherwise let Stripe create customer
+      const sessionParams: Stripe.Checkout.SessionCreateParams = {
         payment_method_types: ['card'],
         mode: 'subscription',
         line_items: [
@@ -426,12 +453,95 @@ export const subscriptionService = {
             detailer_id: detailerId,
           },
         },
+      }
+
+      // If customer ID exists, use it. Otherwise, let Stripe create customer from email
+      if (customerId) {
+        sessionParams.customer = customerId
+      } else if (customerEmail) {
+        sessionParams.customer_email = customerEmail
+      }
+      // If neither, Stripe will collect email during checkout
+
+      const session = await stripeInstance.checkout.sessions.create(sessionParams)
+
+      console.log('✅ Checkout session created:', session.id)
+      return session
+    } catch (error: any) {
+      console.error('❌ Error creating checkout session:', error)
+      console.error('Error details:', {
+        message: error.message,
+        type: error.type,
+        code: error.code,
+        statusCode: error.statusCode,
+        raw: error.raw,
+        priceId,
+        customerId,
+        hasStripeKey: !!process.env.STRIPE_SECRET_KEY,
+        stripeKeyPrefix: process.env.STRIPE_SECRET_KEY?.substring(0, 7)
       })
+      // Re-throw the error so the API route can see the actual Stripe error
+      throw error
+    }
+  },
+
+  // Create Checkout Session for one-time payment (e.g., Lifetime Deal)
+  async createOneTimeCheckoutSession(
+    customerId: string | undefined,
+    priceId: string,
+    detailerId: string,
+    successUrl: string,
+    cancelUrl: string,
+    customerEmail?: string
+  ): Promise<Stripe.Checkout.Session | null> {
+    const stripeInstance = getStripeInstance()
+    if (!stripeInstance) {
+      console.log('🎭 Demo mode: Cannot create one-time checkout session')
+      return null
+    }
+
+    try {
+      // Build session params - use customer ID if available, otherwise let Stripe create customer
+      const sessionParams: Stripe.Checkout.SessionCreateParams = {
+        payment_method_types: ['card'],
+        mode: 'payment', // One-time payment, not subscription
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        metadata: {
+          detailer_id: detailerId,
+          plan_type: 'lifetime',
+        },
+      }
+
+      // If customer ID exists, use it. Otherwise, let Stripe create customer from email
+      if (customerId) {
+        sessionParams.customer = customerId
+      } else if (customerEmail) {
+        sessionParams.customer_email = customerEmail
+      }
+      // If neither, Stripe will collect email during checkout
+
+      const session = await stripeInstance.checkout.sessions.create(sessionParams)
 
       return session
-    } catch (error) {
-      console.error('Error creating checkout session:', error)
-      return null
+    } catch (error: any) {
+      console.error('❌ Error creating one-time checkout session:', error)
+      console.error('Error details:', {
+        message: error.message,
+        type: error.type,
+        code: error.code,
+        statusCode: error.statusCode,
+        priceId,
+        customerId
+      })
+      // Re-throw the error so the API route can see the actual Stripe error
+      throw error
     }
   },
 

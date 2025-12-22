@@ -5,6 +5,30 @@ import { useEffect } from 'react'
 export default function ServiceWorkerRegistration() {
   useEffect(() => {
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      // Auto-unregister old service workers on /upgrade page to prevent caching issues
+      const isUpgradePage = window.location.pathname === '/upgrade'
+      
+      if (isUpgradePage) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          registrations.forEach((registration) => {
+            // Unregister old service workers to force fresh load
+            registration.unregister().then((success) => {
+              if (success) {
+                console.log('[Service Worker] Unregistered old worker to prevent caching')
+                // Clear all caches
+                if ('caches' in window) {
+                  caches.keys().then((cacheNames) => {
+                    cacheNames.forEach((cacheName) => {
+                      caches.delete(cacheName)
+                    })
+                  })
+                }
+              }
+            })
+          })
+        })
+      }
+
       // Register service worker
       window.addEventListener('load', () => {
         navigator.serviceWorker

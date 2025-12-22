@@ -100,8 +100,13 @@ export async function POST(
       )
     }
 
-    // Send SMS
-    const result = await smsService.sendSMS(customer.phone, message)
+    // Send SMS with detailer context
+    const result = await smsService.sendSMS(
+      customer.phone, 
+      message, 
+      detailerData.id,
+      { customerId: customerId }
+    )
     
     if (!result.success) {
       return NextResponse.json(

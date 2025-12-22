@@ -229,6 +229,18 @@ export default function HomePage() {
         </section>
       </main>
 
+      {/* Pricing Section */}
+      <section className="py-12 bg-gray-900 border-t border-gray-800">
+        <div className="container mx-auto px-6 text-center">
+          <Link
+            href="/upgrade"
+            className="text-gray-200 hover:text-white underline text-lg transition-colors"
+          >
+            View Pricing
+          </Link>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="py-8 border-t border-gray-800">
         <div className="container mx-auto px-6 text-center text-gray-500">

@@ -114,7 +114,8 @@ export async function POST(
           appointment.service_type,
           appointmentDate,
           appointmentTime,
-          detailer.business_name
+          detailer.business_name,
+          detailer.id
         )
         console.log('SMS reminder sent:', smsResult)
       } catch (smsError: any) {

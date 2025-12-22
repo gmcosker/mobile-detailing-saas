@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Check, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 
 const pricingPlans = [
@@ -11,6 +12,7 @@ const pricingPlans = [
     id: 'starter',
     name: 'Starter',
     price: 17,
+    billingLabel: 'month',
     description: 'Perfect for getting started',
     features: [
       'Up to 50 customers',
@@ -26,6 +28,7 @@ const pricingPlans = [
     id: 'professional',
     name: 'Professional',
     price: 79,
+    billingLabel: 'month',
     description: 'Most popular for growing businesses',
     features: [
       'Unlimited customers',
@@ -37,20 +40,35 @@ const pricingPlans = [
       'Priority support',
       'Analytics dashboard'
     ],
-    popular: true
+    popular: false,
+    featured: true
   },
   {
     id: 'business',
     name: 'Business',
     price: 149,
+    billingLabel: 'month',
     description: 'For established businesses',
     features: [
       'Everything in Professional',
-      'Multi-user access',
+      'Multi-user access for up to 5 profiles',
       'API access',
       'White-label options',
       'Dedicated support',
       'Custom integrations'
+    ],
+    popular: false
+  },
+  {
+    id: 'lifetime',
+    name: 'Lifetime Deal',
+    price: 300,
+    billingLabel: 'one-time',
+    description: 'Everything in Professional with lifetime access (one payment).',
+    features: [
+      'Everything in Professional',
+      'Lifetime access (no renewals)',
+      'One-time payment'
     ],
     popular: false
   }
@@ -68,7 +86,7 @@ export default function UpgradePage() {
       try {
         const token = localStorage.getItem('auth_token')
         if (!token) {
-          router.push('/login')
+          setIsLoading(false)
           return
         }
 
@@ -93,7 +111,6 @@ export default function UpgradePage() {
 
     fetchDetailerId()
 
-    // Check for plan parameter in URL
     const urlParams = new URLSearchParams(window.location.search)
     const planParam = urlParams.get('plan')
     if (planParam) {
@@ -102,12 +119,6 @@ export default function UpgradePage() {
   }, [router])
 
   const handleSelectPlan = async (planId: string) => {
-    if (!detailerId) {
-      alert('Please log in to upgrade')
-      router.push('/login')
-      return
-    }
-
     setIsProcessing(true)
     setSelectedPlan(planId)
 
@@ -117,18 +128,17 @@ export default function UpgradePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
+          ...(token && { 'Authorization': `Bearer ${token}` }),
         },
         body: JSON.stringify({
           planId,
-          detailerId,
+          detailerId: detailerId || null, // null for new customers
         }),
       })
 
       const data = await response.json()
 
       if (response.ok && data.success && data.checkoutUrl) {
-        // Redirect to Stripe Checkout
         window.location.href = data.checkoutUrl
       } else {
         alert(data.error || 'Failed to create checkout session. Please try again.')
@@ -141,89 +151,151 @@ export default function UpgradePage() {
     }
   }
 
+  const lifetimePlan = pricingPlans.find((p) => p.id === 'lifetime')
+  const mainPlans = pricingPlans.filter((p) => p.id !== 'lifetime')
+
+  const pricingContent = (
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="text-center mb-12">
+        <h1 className="text-3xl font-bold text-foreground mb-4">Choose Your Plan</h1>
+        <p className="text-lg text-muted-foreground">
+          Select the plan that's right for your business. All plans include a 14-day free trial.
+        </p>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-8 mb-10">
+        {mainPlans.map((plan) => (
+          <PlanCard
+            key={plan.id}
+            plan={plan}
+            onSelect={handleSelectPlan}
+            isProcessing={isProcessing && selectedPlan === plan.id}
+          />
+        ))}
+      </div>
+
+      {lifetimePlan && (
+        <div className="grid md:grid-cols-3 gap-8 mb-10">
+          <div></div>
+          <PlanCard
+            plan={lifetimePlan}
+            onSelect={handleSelectPlan}
+            isProcessing={isProcessing && selectedPlan === lifetimePlan.id}
+          />
+          <div></div>
+        </div>
+      )}
+
+      <div className="text-center text-sm text-muted-foreground">
+        <p>All plans include a 14-day free trial. Cancel anytime.</p>
+        <p className="mt-2">
+          Questions? <a href="mailto:support@detailflow.com" className="text-primary hover:underline">Contact support</a>
+        </p>
+      </div>
+    </div>
+  )
+
   if (isLoading) {
     return (
-      <DashboardLayout title="Upgrade">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  // If user is logged in, use DashboardLayout, otherwise use simple public layout
+  if (detailerId) {
+    return (
+      <DashboardLayout title="Upgrade Your Plan">
+        {pricingContent}
       </DashboardLayout>
     )
   }
 
+  // Public layout for non-logged-in users
   return (
-    <DashboardLayout title="Upgrade Your Plan">
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        <div className="text-center mb-12">
-          <h1 className="text-3xl font-bold text-foreground mb-4">Choose Your Plan</h1>
-          <p className="text-lg text-muted-foreground">
-            Select the plan that's right for your business. All plans include a 14-day free trial.
-          </p>
+    <div className="min-h-screen bg-background">
+      <header className="py-4 px-6 md:px-12 border-b border-border">
+        <div className="container mx-auto flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-foreground">DetailFlow</h1>
+          <Link 
+            href="/login" 
+            className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-2 px-5 rounded-lg transition-colors"
+          >
+            Get Started Free
+          </Link>
         </div>
-
-        <div className="grid md:grid-cols-3 gap-8 mb-8">
-          {pricingPlans.map((plan) => (
-            <div
-              key={plan.id}
-              className={`relative border-2 rounded-lg p-8 ${
-                plan.popular
-                  ? 'border-primary bg-primary/5 scale-105'
-                  : 'border-border bg-card'
-              }`}
-            >
-              {plan.popular && (
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-primary text-primary-foreground text-sm font-semibold px-4 py-1 rounded-full">
-                    Most Popular
-                  </span>
-                </div>
-              )}
-
-              <div className="text-center mb-6">
-                <h3 className="text-2xl font-bold text-foreground mb-2">{plan.name}</h3>
-                <p className="text-sm text-muted-foreground mb-4">{plan.description}</p>
-                <div className="flex items-baseline justify-center gap-1">
-                  <span className="text-4xl font-bold text-foreground">${plan.price}</span>
-                  <span className="text-muted-foreground">/month</span>
-                </div>
-              </div>
-
-              <ul className="space-y-4 mb-8">
-                {plan.features.map((feature, index) => (
-                  <li key={index} className="flex items-start gap-3">
-                    <Check className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                    <span className="text-foreground">{feature}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <Button
-                onClick={() => handleSelectPlan(plan.id)}
-                className="w-full"
-                variant={plan.popular ? 'default' : 'outline'}
-                disabled={isProcessing}
-              >
-                {isProcessing && selectedPlan === plan.id ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  `Select ${plan.name}`
-                )}
-              </Button>
-            </div>
-          ))}
-        </div>
-
-        <div className="text-center text-sm text-muted-foreground">
-          <p>All plans include a 14-day free trial. Cancel anytime.</p>
-          <p className="mt-2">
-            Questions? <a href="mailto:support@detailflow.com" className="text-primary hover:underline">Contact support</a>
-          </p>
-        </div>
-      </div>
-    </DashboardLayout>
+      </header>
+      <main className="py-8">
+        {pricingContent}
+      </main>
+    </div>
   )
 }
 
+function PlanCard({
+  plan,
+  onSelect,
+  isProcessing,
+}: {
+  plan: typeof pricingPlans[number] & { featured?: boolean }
+  onSelect: (planId: string) => void
+  isProcessing: boolean
+}) {
+  return (
+    <div
+      className={`relative border-2 rounded-lg p-8 transition-all ${
+        plan.featured 
+          ? 'border-blue-500 bg-gradient-to-br from-blue-100 via-cyan-100 to-blue-200 dark:from-blue-900/40 dark:via-cyan-900/40 dark:to-blue-800/40 shadow-xl scale-[1.03] ring-2 ring-blue-400/50' 
+          : plan.popular 
+          ? 'border-primary bg-primary/5 scale-[1.02]' 
+          : 'border-border bg-card'
+      }`}
+    >
+
+      <div className="text-center mb-6">
+        {/* NO BADGES - explicitly removed */}
+        <h3 className="text-2xl font-bold text-foreground mb-2">{plan.name}</h3>
+        <p className="text-sm text-muted-foreground mb-4">{plan.description}</p>
+        <div className="flex items-baseline justify-center gap-1">
+          <span className="text-4xl font-bold text-foreground">${plan.price}</span>
+          <span className="text-muted-foreground">/{plan.billingLabel || 'month'}</span>
+        </div>
+      </div>
+
+      <ul className="space-y-4 mb-8">
+        {plan.features.map((feature, index) => (
+          <li key={index} className="flex items-start gap-3">
+            <Check className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+            <span className="text-foreground">{feature}</span>
+          </li>
+        ))}
+      </ul>
+
+      <Button
+        onClick={() => onSelect(plan.id)}
+        className={`w-full font-bold text-lg py-7 ${
+          plan.featured 
+            ? 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white border-0 shadow-2xl hover:shadow-2xl transform hover:scale-105 transition-all brightness-110' 
+            : ''
+        }`}
+        variant={plan.featured ? 'default' : plan.popular ? 'default' : 'outline'}
+        disabled={isProcessing}
+        style={plan.featured ? { 
+          background: 'linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)',
+          boxShadow: '0 10px 25px rgba(37, 99, 235, 0.4)',
+          fontWeight: '700'
+        } : {}}
+      >
+        {isProcessing ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Processing...
+          </>
+        ) : (
+          `Select ${plan.name}`
+        )}
+      </Button>
+    </div>
+  )
+}

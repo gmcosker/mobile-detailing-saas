@@ -1,3 +1,5 @@
+import { getSupabaseClient } from '@/lib/supabase'
+
 // Twilio client will be initialized only on server-side
 let twilioClient: any = null
 
@@ -55,9 +57,88 @@ export const smsTemplates = {
 
 // SMS Service functions
 export const smsService = {
-  // Send a single SMS
-  async sendSMS(to: string, message: string, scheduledTime?: Date): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  // Verify customer belongs to detailer before sending SMS
+  async verifyCustomerAccess(
+    customerId: string,
+    detailerId: string
+  ): Promise<{ valid: boolean; error?: string }> {
     try {
+      const supabase = getSupabaseClient()
+      if (!supabase) {
+        return { valid: false, error: 'Database connection failed' }
+      }
+
+      // Check if customer has any appointments with this detailer
+      const { data: appointments, error } = await supabase
+        .from('appointments')
+        .select('id')
+        .eq('customer_id', customerId)
+        .eq('detailer_id', detailerId)
+        .limit(1)
+
+      if (error) {
+        console.error('[SMS] Database error verifying customer access:', error)
+        return { valid: false, error: 'Database error' }
+      }
+
+      if (!appointments || appointments.length === 0) {
+        return { valid: false, error: 'Customer does not belong to this detailer' }
+      }
+
+      return { valid: true }
+    } catch (error: any) {
+      console.error('[SMS] Error verifying customer access:', error)
+      return { valid: false, error: error.message }
+    }
+  },
+
+  // Send a single SMS
+  async sendSMS(
+    to: string,
+    message: string,
+    detailerId: string,
+    options?: {
+      scheduledTime?: Date
+      businessName?: string
+      customerId?: string // Optional: verify customer belongs to detailer
+    }
+  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    try {
+      // Validate detailerId
+      if (!detailerId) {
+        throw new Error('Detailer ID is required')
+      }
+
+      // Verify detailer exists
+      const supabase = getSupabaseClient()
+      if (supabase) {
+        const { data: detailer, error: detailerError } = await supabase
+          .from('detailers')
+          .select('id, business_name')
+          .eq('id', detailerId)
+          .single()
+
+        if (detailerError || !detailer) {
+          console.error(`[SMS] Detailer ${detailerId} not found`)
+          return {
+            success: false,
+            error: `Detailer ${detailerId} not found`
+          }
+        }
+      }
+
+      // Verify customer access if customerId provided
+      if (options?.customerId) {
+        const verification = await this.verifyCustomerAccess(options.customerId, detailerId)
+        if (!verification.valid) {
+          console.error(`[SMS] Customer access verification failed for detailer ${detailerId}:`, verification.error)
+          return {
+            success: false,
+            error: verification.error || 'Customer does not belong to this detailer'
+          }
+        }
+      }
+
       // Validate phone number format
       const cleanPhone = to.replace(/\D/g, '')
       if (cleanPhone.length < 10) {
@@ -66,10 +147,16 @@ export const smsService = {
 
       const formattedPhone = cleanPhone.length === 10 ? `+1${cleanPhone}` : `+${cleanPhone}`
 
+      // Log with detailer context
+      console.log(`[SMS] Detailer ${detailerId} sending SMS to ${formattedPhone}`)
+      if (options?.businessName) {
+        console.log(`[SMS] Business: ${options.businessName}`)
+      }
+
       // If scheduled for future, we'd use a job queue in production
       // For now, we'll just send immediately or simulate scheduling
-      if (scheduledTime && scheduledTime > new Date()) {
-        console.log(`SMS scheduled for ${scheduledTime.toISOString()}: ${message} to ${formattedPhone}`)
+      if (options?.scheduledTime && options.scheduledTime > new Date()) {
+        console.log(`[SMS] Scheduled for ${options.scheduledTime.toISOString()}: ${message} to ${formattedPhone} (Detailer: ${detailerId})`)
         
         // In production, you'd add this to a job queue
         // For demo, we'll return success
@@ -109,7 +196,7 @@ export const smsService = {
         }
       }
 
-      console.log(`[SMS] Attempting to send SMS to ${formattedPhone} from ${twilioPhoneNumber}`)
+      console.log(`[SMS] Attempting to send SMS to ${formattedPhone} from ${twilioPhoneNumber} (Detailer: ${detailerId})`)
       console.log(`[SMS] Original phone number: "${to}", Cleaned: "${cleanPhone}", Formatted: "${formattedPhone}"`)
       const result = await client.messages.create({
         body: message,
@@ -124,17 +211,18 @@ export const smsService = {
         messageId: result.sid,
       }
     } catch (error: any) {
-      console.error('[SMS] Error sending SMS:', error)
+      console.error(`[SMS] Error sending SMS for detailer ${detailerId}:`, error)
       console.error('[SMS] Error details:', {
         message: error.message,
         code: error.code,
         status: error.status,
-        moreInfo: error.moreInfo
+        moreInfo: error.moreInfo,
+        detailerId
       })
       
       // For demo purposes, simulate success when Twilio credentials aren't real
       if (error.message?.includes('ACdummy') || (process.env.NODE_ENV === 'development' && !process.env.TWILIO_ACCOUNT_SID)) {
-        console.log(`[DEMO MODE] SMS would be sent: ${message} to ${to}`)
+        console.log(`[DEMO MODE] SMS would be sent: ${message} to ${to} (Detailer: ${detailerId})`)
         return {
           success: false,
           error: 'Twilio credentials not configured',
@@ -144,7 +232,7 @@ export const smsService = {
 
       return {
         success: false,
-        error: error.message || 'Failed to send SMS',
+        error: error.message || `Failed to send SMS for detailer ${detailerId}`,
       }
     }
   },
@@ -156,7 +244,8 @@ export const smsService = {
     serviceType: string,
     appointmentDate: string,
     appointmentTime: string,
-    businessName: string
+    businessName: string,
+    detailerId: string
   ) {
     const message = smsTemplates.appointmentReminder(
       customerName,
@@ -166,7 +255,7 @@ export const smsService = {
       businessName
     )
 
-    return await this.sendSMS(customerPhone, message)
+    return await this.sendSMS(customerPhone, message, detailerId, { businessName })
   },
 
   // Send appointment confirmation
@@ -176,7 +265,8 @@ export const smsService = {
     serviceType: string,
     appointmentDate: string,
     appointmentTime: string,
-    businessName: string
+    businessName: string,
+    detailerId: string
   ) {
     const message = smsTemplates.appointmentConfirmation(
       customerName,
@@ -186,7 +276,7 @@ export const smsService = {
       businessName
     )
 
-    return await this.sendSMS(customerPhone, message)
+    return await this.sendSMS(customerPhone, message, detailerId, { businessName })
   },
 
   // Send "on my way" notification
@@ -194,10 +284,11 @@ export const smsService = {
     customerPhone: string,
     customerName: string,
     businessName: string,
-    eta: string
+    eta: string,
+    detailerId: string
   ) {
     const message = smsTemplates.onMyWay(customerName, businessName, eta)
-    return await this.sendSMS(customerPhone, message)
+    return await this.sendSMS(customerPhone, message, detailerId, { businessName })
   },
 
   // Send service complete notification
@@ -205,10 +296,11 @@ export const smsService = {
     customerPhone: string,
     customerName: string,
     businessName: string,
+    detailerId: string,
     paymentLink?: string
   ) {
     const message = smsTemplates.serviceComplete(customerName, businessName, paymentLink)
-    return await this.sendSMS(customerPhone, message)
+    return await this.sendSMS(customerPhone, message, detailerId, { businessName })
   },
 
   // Send payment reminder
@@ -217,10 +309,11 @@ export const smsService = {
     customerName: string,
     amount: string,
     paymentLink: string,
-    businessName: string
+    businessName: string,
+    detailerId: string
   ) {
     const message = smsTemplates.paymentReminder(customerName, amount, paymentLink, businessName)
-    return await this.sendSMS(customerPhone, message)
+    return await this.sendSMS(customerPhone, message, detailerId, { businessName })
   },
 
   // Send appointment reschedule notification
@@ -231,7 +324,8 @@ export const smsService = {
     oldDate: string,
     oldTime: string,
     businessName: string,
-    reason: string
+    reason: string,
+    detailerId: string
   ) {
     const message = smsTemplates.appointmentReschedule(
       customerName,
@@ -241,7 +335,7 @@ export const smsService = {
       businessName,
       reason
     )
-    return await this.sendSMS(customerPhone, message)
+    return await this.sendSMS(customerPhone, message, detailerId, { businessName })
   },
 
   // Send appointment cancellation notification
@@ -252,7 +346,8 @@ export const smsService = {
     date: string,
     time: string,
     businessName: string,
-    reason: string
+    reason: string,
+    detailerId: string
   ) {
     const message = smsTemplates.appointmentCancellation(
       customerName,
@@ -262,7 +357,7 @@ export const smsService = {
       businessName,
       reason
     )
-    return await this.sendSMS(customerPhone, message)
+    return await this.sendSMS(customerPhone, message, detailerId, { businessName })
   },
 
   // Schedule 24-hour reminder
@@ -272,14 +367,15 @@ export const smsService = {
     customerName: string,
     serviceType: string,
     appointmentDateTime: Date,
-    businessName: string
+    businessName: string,
+    detailerId: string
   ) {
     // Calculate 24 hours before appointment
     const reminderTime = new Date(appointmentDateTime.getTime() - 24 * 60 * 60 * 1000)
     
     // Only schedule if reminder time is in the future
     if (reminderTime <= new Date()) {
-      console.log('Appointment is within 24 hours, not scheduling reminder')
+      console.log(`[SMS] Appointment is within 24 hours, not scheduling reminder (Detailer: ${detailerId})`)
       return { success: false, error: 'Appointment is too soon for 24-hour reminder' }
     }
 
@@ -306,9 +402,12 @@ export const smsService = {
 
     // In production, you'd save this to a database and use a job scheduler
     // For demo, we'll simulate scheduling
-    console.log(`[REMINDER SCHEDULED] ${reminderTime.toISOString()}: ${message}`)
+    console.log(`[REMINDER SCHEDULED] ${reminderTime.toISOString()}: ${message} (Detailer: ${detailerId})`)
     
-    return await this.sendSMS(customerPhone, message, reminderTime)
+    return await this.sendSMS(customerPhone, message, detailerId, { 
+      scheduledTime: reminderTime,
+      businessName 
+    })
   },
 
   // Format phone number for display

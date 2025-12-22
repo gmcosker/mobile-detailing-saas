@@ -13,7 +13,8 @@ import {
   Check,
   ArrowLeft,
   Car,
-  Loader2
+  Loader2,
+  AlertCircle
 } from 'lucide-react'
 // Removed direct database service imports - using API endpoints instead
 
@@ -45,7 +46,7 @@ export default function BookingPage({ detailerId: detailerIdProp }: BookingPageP
   const params = useParams()
   const detailerId = detailerIdProp || (params?.detailerId as string) || ''
   
-  console.log('BookingPage render - detailerIdProp:', detailerIdProp, 'params.detailerId:', params?.detailerId, 'final detailerId:', detailerId)
+      // Removed verbose logging for production
   
   const [step, setStep] = useState(1) // 1: Service, 2: Date/Time, 3: Details, 4: Confirmation
   const [selectedService, setSelectedService] = useState<any>(null)
@@ -66,6 +67,7 @@ export default function BookingPage({ detailerId: detailerIdProp }: BookingPageP
   const [bookedSlots, setBookedSlots] = useState<{date: string, time: string}[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   // Get custom CSS variables based on branding
   const getCustomStyles = () => {
@@ -84,12 +86,10 @@ export default function BookingPage({ detailerId: detailerIdProp }: BookingPageP
     const loadData = async () => {
       // Guard: Don't make API call if detailerId is missing
       if (!detailerId) {
-        console.error('BookingPage: detailerId is missing!', detailerId)
+        setError('Invalid booking link')
         setLoading(false)
         return
       }
-      
-      console.log('BookingPage: Loading data for detailerId:', detailerId)
       setLoading(true)
       try {
         // Calculate date range for booked slots using local timezone
@@ -104,8 +104,13 @@ export default function BookingPage({ detailerId: detailerIdProp }: BookingPageP
 
         // Load all booking data from API
         const apiUrl = `/api/booking/${detailerId}/info?startDate=${startDate}&endDate=${endDate}`
-        console.log('BookingPage: Fetching from:', apiUrl)
         const response = await fetch(apiUrl)
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || `Failed to load booking page (${response.status})`)
+        }
+        
         const data = await response.json()
 
         if (response.ok && data.success) {
@@ -118,7 +123,6 @@ export default function BookingPage({ detailerId: detailerIdProp }: BookingPageP
           }
 
           // Always use services from the database (even if empty array)
-          // Never use defaults if API call succeeds
           if (data.services !== undefined) {
             // Transform database services to match booking page format
             const transformedServices = data.services.map((service: any) => ({
@@ -130,10 +134,7 @@ export default function BookingPage({ detailerId: detailerIdProp }: BookingPageP
               category: service.category || 'General'
             }))
             setServices(transformedServices)
-            console.log(`Loaded ${transformedServices.length} services from database for detailer:`, detailerId, transformedServices)
           } else {
-            // Services field not in response - set empty array
-            console.warn('Services field missing from API response, setting empty array')
             setServices([])
           }
 
@@ -141,16 +142,12 @@ export default function BookingPage({ detailerId: detailerIdProp }: BookingPageP
             setBookedSlots(data.bookedSlots)
           }
         } else {
-          console.error('Error loading booking data:', data.error)
-          // API call failed - set empty array, don't use defaults
-          setServices([])
-          console.warn('API call failed, setting empty services array')
+          throw new Error(data.error || 'Failed to load booking information')
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error loading booking data:', error)
-        // Set empty array on error - API will validate on submit
+        setError(error.message || 'Failed to load booking page. Please try again later.')
         setServices([])
-        console.warn('Error occurred, setting empty services array')
       } finally {
         setLoading(false)
       }
@@ -219,15 +216,6 @@ export default function BookingPage({ detailerId: detailerIdProp }: BookingPageP
   }
 
   const handleBookingSubmit = async () => {
-    console.log('handleBookingSubmit called', {
-      detailerId,
-      selectedDate,
-      selectedTime,
-      selectedService,
-      detailer,
-      customerInfo
-    })
-    
     // Validation - check all required fields
     if (!selectedDate) {
       alert('Please select a date')
@@ -244,12 +232,9 @@ export default function BookingPage({ detailerId: detailerIdProp }: BookingPageP
       return
     }
     
-    // Note: We allow booking even if detailer data isn't loaded
-    // The API will validate the detailer exists when the booking is submitted
-    // This allows the page to work even if the initial data load fails
     if (!detailer) {
-      console.warn('Detailer data not loaded, but proceeding with booking. API will validate.')
-      // Don't block the booking - let the API handle validation
+      alert('Unable to load detailer information. Please refresh the page and try again.')
+      return
     }
     
     if (!customerInfo.name || !customerInfo.phone || !customerInfo.address) {
@@ -299,17 +284,16 @@ export default function BookingPage({ detailerId: detailerIdProp }: BookingPageP
         })
       })
 
-      const data = await response.json()
-      
-      console.log('Booking API response:', { status: response.status, data })
-
-      if (!response.ok || !data.success) {
-        const errorMessage = data.error || 'Failed to book appointment'
-        console.error('Booking failed:', errorMessage)
-        throw new Error(errorMessage)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || `Booking failed (${response.status})`)
       }
 
-      console.log('Booking created successfully:', data.appointment)
+      const data = await response.json()
+
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to book appointment')
+      }
       
       // Immediately refresh booked slots so the newly booked slot is grayed out
       await refreshBookedSlots()
@@ -317,7 +301,7 @@ export default function BookingPage({ detailerId: detailerIdProp }: BookingPageP
       setStep(4)
     } catch (error: any) {
       console.error('Error creating booking:', error)
-      const errorMessage = error.message || 'Failed to book appointment. Please check the console for details.'
+      const errorMessage = error.message || 'Failed to book appointment. Please try again.'
       alert(errorMessage)
     } finally {
       setSubmitting(false)
@@ -328,8 +312,21 @@ export default function BookingPage({ detailerId: detailerIdProp }: BookingPageP
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
           <p className="text-muted-foreground">Loading booking options...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <div className="max-w-md w-full text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-foreground mb-2">Unable to Load Booking Page</h2>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>Try Again</Button>
         </div>
       </div>
     )
@@ -714,7 +711,7 @@ export default function BookingPage({ detailerId: detailerIdProp }: BookingPageP
           {/* Step 4: Confirmation */}
           {step === 4 && (
             <div className="text-center space-y-6">
-              <div className="bg-green-50 dark:bg-green-950 p-6 rounded-lg">
+              <div className="bg-green-50 dark:bg-green-950 p-6 rounded-lg border border-green-200 dark:border-green-800">
                 <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Check className="h-8 w-8 text-white" />
                 </div>
@@ -722,45 +719,54 @@ export default function BookingPage({ detailerId: detailerIdProp }: BookingPageP
                   Booking Confirmed!
                 </h2>
                 <p className="text-muted-foreground">
-                  Your appointment has been successfully booked.
+                  Your appointment has been successfully booked. We look forward to serving you!
                 </p>
               </div>
 
-              <div className="bg-card border border-border rounded-lg p-4 text-left">
-                <h3 className="font-semibold text-foreground mb-3">Appointment Details</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
+              <div className="bg-card border border-border rounded-lg p-6 text-left">
+                <h3 className="font-semibold text-foreground mb-4">Appointment Summary</h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between items-center py-2 border-b border-border">
                     <span className="text-muted-foreground">Service:</span>
-                    <span className="text-foreground">{selectedService?.name}</span>
+                    <span className="text-foreground font-medium">{selectedService?.name}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center py-2 border-b border-border">
                     <span className="text-muted-foreground">Date:</span>
-                    <span className="text-foreground">
+                    <span className="text-foreground font-medium">
                       {selectedDate?.toLocaleDateString('en-US', { 
                         weekday: 'long', 
                         month: 'long', 
-                        day: 'numeric' 
+                        day: 'numeric',
+                        year: 'numeric'
                       })}
                     </span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center py-2 border-b border-border">
                     <span className="text-muted-foreground">Time:</span>
-                    <span className="text-foreground">{selectedTime}</span>
+                    <span className="text-foreground font-medium">{selectedTime}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Price:</span>
-                    <span className="text-foreground font-medium">${selectedService?.price}</span>
+                  {customerInfo.address && (
+                    <div className="flex justify-between items-start py-2 border-b border-border">
+                      <span className="text-muted-foreground">Location:</span>
+                      <span className="text-foreground font-medium text-right max-w-[60%]">{customerInfo.address}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center pt-2">
+                    <span className="text-muted-foreground">Total Amount:</span>
+                    <span className="text-foreground font-bold text-lg">${selectedService?.price?.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
+              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-2">
+                <p className="text-sm font-medium text-foreground">
                   📱 You'll receive a text reminder 24 hours before your appointment
                 </p>
-                <p className="text-sm text-muted-foreground">
-                  Questions? Call {detailer?.phone || '(555) 123-4567'}
-                </p>
+                {detailer?.phone && (
+                  <p className="text-sm text-muted-foreground">
+                    Questions? Call us at <a href={`tel:${detailer.phone}`} className="text-primary font-medium hover:underline">{detailer.phone}</a>
+                  </p>
+                )}
               </div>
             </div>
           )}

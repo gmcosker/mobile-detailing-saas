@@ -1,13 +1,13 @@
 # Notification Infrastructure Status
 
-## ✅ SMS/Twilio Infrastructure - FULLY CONFIGURED
+## ✅ SMS/AWS SNS Infrastructure - FULLY CONFIGURED
 
-### Status: **READY TO SEND SMS** (when Twilio credentials are configured)
+### Status: **READY TO SEND SMS** (when AWS SNS credentials are configured)
 
 ### What's Set Up:
-1. **Twilio SDK Installed**: `twilio@^5.8.2` in package.json
+1. **AWS SNS SDK Installed**: `@aws-sdk/client-sns` in package.json
 2. **SMS Service Module**: `src/lib/sms.ts` - Complete SMS service with:
-   - Twilio client initialization
+   - AWS SNS client initialization
    - Phone number validation and formatting
    - SMS templates for all appointment types
    - Error handling and demo mode fallback
@@ -15,26 +15,29 @@
    - `/api/sms/send` - General SMS sending
    - `/api/sms/reminders` - Automated appointment reminders
    - `/api/appointments/[id]/confirm` - Sends SMS on confirmation
-4. **Webhook Support**: `/api/webhooks/twilio` - Handles Twilio status updates
 
 ### How It Works:
 - When you click "Confirm" on an appointment:
   1. The appointment status is updated to 'confirmed'
   2. `smsService.sendAppointmentConfirmation()` is called
-  3. SMS is sent via Twilio API to customer's phone number
+  3. SMS is sent via AWS SNS API to customer's phone number
   4. Returns success/failure status with message ID
 
 ### Required Environment Variables:
 ```env
-TWILIO_ACCOUNT_SID=your_account_sid_here
-TWILIO_AUTH_TOKEN=your_auth_token_here
-TWILIO_PHONE_NUMBER=+1234567890  # Your Twilio phone number
+AWS_ACCESS_KEY_ID=your_access_key_id
+AWS_SECRET_ACCESS_KEY=your_secret_access_key
+AWS_REGION=us-east-1
+AWS_SNS_PHONE_NUMBER=+1234567890  # Your AWS SNS phone number
 ```
 
 ### Current Behavior:
-- **With Twilio credentials**: Sends real SMS via Twilio
-- **Without Twilio credentials**: Runs in demo mode (logs SMS content, returns success)
+- **With AWS SNS credentials**: Sends real SMS via AWS SNS
+- **Without AWS SNS credentials**: Runs in demo mode (logs SMS content, returns success)
 - **Error handling**: Gracefully falls back to demo mode if credentials are invalid
+
+### Important Setup Note:
+**CRITICAL:** You must request an SMS spending limit increase in AWS SNS (default $1/month won't work). See `SETUP_GUIDE.md` for details.
 
 ### SMS Templates Available:
 - ✅ Appointment Confirmation

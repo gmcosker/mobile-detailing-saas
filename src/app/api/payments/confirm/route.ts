@@ -30,14 +30,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Update appointment with payment status (only if appointment exists)
-    let updated = true
-    if (appointmentId !== 'test-123') {
-      updated = await appointmentService.updateStatus(appointmentId, 'confirmed')
-      
-      if (!updated) {
-        console.warn('Failed to update appointment status, but payment was successful')
-        // Don't fail the entire request if appointment update fails
+    // Update appointment with payment status and payment_intent_id
+    let updatedAppointment = null
+    if (appointmentId && appointmentId !== 'test-123') {
+      try {
+        updatedAppointment = await appointmentService.update(appointmentId, {
+          payment_status: 'paid',
+          stripe_payment_intent_id: paymentIntentId,
+          status: 'confirmed' // Also confirm the appointment when payment succeeds
+        })
+        
+        if (!updatedAppointment) {
+          console.warn('Failed to update appointment, but payment was successful')
+        }
+      } catch (updateError) {
+        console.error('Error updating appointment after payment:', updateError)
+        // Don't fail the entire request if appointment update fails - payment already succeeded
       }
     }
 
@@ -45,6 +53,7 @@ export async function POST(request: NextRequest) {
       success: true,
       paymentStatus: paymentIntent.status,
       amount: paymentIntent.amount,
+      appointment: updatedAppointment,
       message: 'Payment confirmed successfully'
     })
 

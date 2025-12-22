@@ -127,7 +127,8 @@ export async function POST(
           appointment.service_type,
           appointmentDate,
           appointmentTime,
-          detailer.business_name
+          detailer.business_name,
+          detailer.id
         )
         console.log('[CONFIRM] SMS result:', smsResult)
         if (!smsResult.success) {

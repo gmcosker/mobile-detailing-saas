@@ -262,15 +262,25 @@ export async function POST(
     })
 
     if (!appointment) {
+      console.error('Failed to create appointment - database returned null')
       return NextResponse.json(
-        { success: false, error: 'Failed to create appointment' },
+        { success: false, error: 'Failed to create appointment. Please try again.' },
         { status: 500 }
       )
     }
 
+    // Return appointment with essential info including ID for payment link generation
     return NextResponse.json({
       success: true,
-      appointment
+      appointment: {
+        id: appointment.id,
+        scheduled_date: appointment.scheduled_date,
+        scheduled_time: appointment.scheduled_time,
+        service_type: appointment.service_type,
+        total_amount: appointment.total_amount,
+        status: appointment.status,
+        payment_status: appointment.payment_status
+      }
     }, { status: 201 })
 
   } catch (error) {

@@ -201,6 +201,32 @@ export type Database = {
           mime_type?: string
         }
       }
+      leads: {
+        Row: {
+          id: string
+          created_at: string
+          email: string
+          source: string
+          subscribed: boolean
+          notes: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          email: string
+          source?: string
+          subscribed?: boolean
+          notes?: string | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          email?: string
+          source?: string
+          subscribed?: boolean
+          notes?: string | null
+        }
+      }
     }
     Views: {
       [_ in never]: never

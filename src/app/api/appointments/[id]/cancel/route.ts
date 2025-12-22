@@ -137,7 +137,8 @@ export async function POST(
           appointmentDate,
           appointmentTime,
           detailer.business_name,
-          reason.trim()
+          reason.trim(),
+          detailer.id
         )
         console.log('SMS cancellation notification sent:', smsResult)
       } catch (smsError: any) {

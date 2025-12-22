@@ -19,7 +19,11 @@ import {
   Loader2,
   X,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  CreditCard,
+  Link2,
+  Copy,
+  Check
 } from 'lucide-react'
 
 interface Appointment {
@@ -29,6 +33,7 @@ interface Appointment {
   service_type: string
   status: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled' | 'no_show'
   total_amount: number | null
+  payment_status: 'pending' | 'paid' | 'failed' | null
   notes: string | null
   customers: {
     name: string
@@ -365,6 +370,57 @@ export default function SchedulePage() {
     }
   }
 
+  const handleGeneratePaymentLink = async (appointment: Appointment) => {
+    if (!appointment.total_amount) {
+      alert('Appointment does not have an amount set')
+      return
+    }
+
+    setActionLoading(`payment-${appointment.id}`)
+    try {
+      const token = localStorage.getItem('auth_token')
+      if (!token) {
+        alert('Not authenticated. Please log in again.')
+        return
+      }
+
+      const description = `${appointment.service_type} - ${appointment.customers.name}`
+
+      const response = await fetch('/api/payments/create-link', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          amount: appointment.total_amount,
+          description,
+          appointmentId: appointment.id
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to create payment link')
+      }
+
+      // Copy link to clipboard
+      if (data.url) {
+        await navigator.clipboard.writeText(data.url)
+        alert(`Payment link created and copied to clipboard!\n\n${data.url}\n\nShare this link with the customer to collect payment.`)
+      } else {
+        alert('Payment link created but URL not returned')
+      }
+
+    } catch (err: any) {
+      console.error('Error generating payment link:', err)
+      alert(err.message || 'Failed to generate payment link. Please try again.')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   const formatDate = (date: string): string => {
     return new Date(date).toLocaleDateString('en-US', {
       weekday: 'short',
@@ -533,10 +589,11 @@ export default function SchedulePage() {
           onReschedule={handleReschedule}
           onCancel={handleCancel}
           onSendReminder={handleSendReminder}
-          onViewDetails={handleViewDetails}
-          onClear={handleClear}
-          actionLoading={actionLoading}
-        />
+                    onViewDetails={handleViewDetails}
+                    onClear={handleClear}
+                    actionLoading={actionLoading}
+                    onGeneratePaymentLink={handleGeneratePaymentLink}
+                  />
       ) : (
         <>
           {/* Today's Appointments */}
@@ -575,6 +632,7 @@ export default function SchedulePage() {
                     onViewDetails={handleViewDetails}
                     onClear={handleClear}
                     actionLoading={actionLoading}
+                    onGeneratePaymentLink={handleGeneratePaymentLink}
                   />
                 ))}
               </div>
@@ -619,6 +677,7 @@ export default function SchedulePage() {
                     onViewDetails={handleViewDetails}
                     onClear={handleClear}
                     actionLoading={actionLoading}
+                    onGeneratePaymentLink={handleGeneratePaymentLink}
                   />
                 ))}
               </div>
@@ -655,10 +714,11 @@ export default function SchedulePage() {
                   onReschedule={handleReschedule}
                   onCancel={handleCancel}
                   onSendReminder={handleSendReminder}
-                  onViewDetails={handleViewDetails}
-                  onClear={handleClear}
-                  actionLoading={actionLoading}
-                />
+                    onViewDetails={handleViewDetails}
+                    onClear={handleClear}
+                    actionLoading={actionLoading}
+                    onGeneratePaymentLink={handleGeneratePaymentLink}
+                  />
               ))}
             </div>
           )}
@@ -693,10 +753,11 @@ export default function SchedulePage() {
                   onReschedule={handleReschedule}
                   onCancel={handleCancel}
                   onSendReminder={handleSendReminder}
-                  onViewDetails={handleViewDetails}
-                  onClear={handleClear}
-                  actionLoading={actionLoading}
-                />
+                    onViewDetails={handleViewDetails}
+                    onClear={handleClear}
+                    actionLoading={actionLoading}
+                    onGeneratePaymentLink={handleGeneratePaymentLink}
+                  />
               ))}
             </div>
           )}
@@ -842,7 +903,8 @@ function AppointmentCard({
   onSendReminder,
   onViewDetails,
   onClear,
-  actionLoading
+  actionLoading,
+  onGeneratePaymentLink
 }: { 
   appointment: Appointment
   formatTime: (time: string) => string
@@ -911,11 +973,23 @@ function AppointmentCard({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
         <span className={`text-xs px-2 py-1 rounded-full ${status.color}`}>
           <StatusIcon className="h-3 w-3 inline mr-1" />
           {status.label}
         </span>
+        {appointment.payment_status && (
+          <span className={`text-xs px-2 py-1 rounded-full ${
+            appointment.payment_status === 'paid' 
+              ? 'text-green-600 bg-green-50 dark:bg-green-950 dark:text-green-400'
+              : appointment.payment_status === 'failed'
+              ? 'text-red-600 bg-red-50 dark:bg-red-950 dark:text-red-400'
+              : 'text-orange-600 bg-orange-50 dark:bg-orange-950 dark:text-orange-400'
+          }`}>
+            <CreditCard className="h-3 w-3 inline mr-1" />
+            {appointment.payment_status === 'paid' ? 'Paid' : appointment.payment_status === 'failed' ? 'Payment Failed' : 'Payment Pending'}
+          </span>
+        )}
         {appointment.total_amount && (
           <span className="text-sm font-medium text-foreground">${appointment.total_amount.toFixed(2)}</span>
         )}
@@ -1005,6 +1079,27 @@ function AppointmentCard({
                 </>
               ) : (
                 'Send Reminder'
+              )}
+            </Button>
+          )}
+          {appointment.total_amount && appointment.payment_status !== 'paid' && appointment.status !== 'cancelled' && (
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => onGeneratePaymentLink?.(appointment)}
+              disabled={!!actionLoading || actionLoading === `payment-${appointment.id}`}
+              className="h-12 sm:h-10 w-full sm:w-auto"
+            >
+              {actionLoading === `payment-${appointment.id}` ? (
+                <>
+                  <Loader2 className="h-4 w-4 sm:h-3 sm:w-3 mr-2 sm:mr-1 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Link2 className="h-4 w-4 sm:h-3 sm:w-3 mr-2 sm:mr-1" />
+                  Payment Link
+                </>
               )}
             </Button>
           )}
@@ -1383,7 +1478,8 @@ function CalendarView({
   onSendReminder,
   onViewDetails,
   onClear,
-  actionLoading
+  actionLoading,
+  onGeneratePaymentLink
 }: {
   appointments: Appointment[]
   currentMonth: Date
@@ -1397,6 +1493,7 @@ function CalendarView({
   onViewDetails?: (appointment: Appointment) => void
   onClear?: (appointmentId: string) => void
   actionLoading?: string | null
+  onGeneratePaymentLink?: (appointment: Appointment) => void
 }) {
   const normalizeDate = (dateStr: string): string => {
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
@@ -1591,6 +1688,7 @@ function CalendarView({
                   onViewDetails={onViewDetails}
                   onClear={onClear}
                   actionLoading={actionLoading}
+                  onGeneratePaymentLink={onGeneratePaymentLink}
                 />
               ))}
           </div>

@@ -199,10 +199,32 @@ export async function POST(request: NextRequest) {
     const trialStartedAt = new Date().toISOString()
     const trialEndsAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // 14 days from now
     
+    // Create Stripe Connect account for receiving customer payments
+    let stripeAccountId: string | null = null
+    try {
+      const { connectService } = await import('@/lib/stripe')
+      const connectAccount = await connectService.createConnectAccount(
+        business_name,
+        email,
+        'US' // Default to US, could be configurable
+      )
+      
+      if (connectAccount) {
+        stripeAccountId = connectAccount.id
+        console.log(`[SIGNUP] Created Stripe Connect account: ${stripeAccountId} for detailer: ${detailer.id}`)
+      } else {
+        console.warn('[SIGNUP] Failed to create Stripe Connect account (may not be configured)')
+      }
+    } catch (connectError) {
+      console.error('[SIGNUP] Error creating Stripe Connect account:', connectError)
+      // Don't fail signup if Connect account creation fails
+    }
+    
     const trialUpdated = await detailerService.update(detailer.id, {
       trial_started_at: trialStartedAt,
       trial_ends_at: trialEndsAt,
-      subscription_status: 'trial'
+      subscription_status: 'trial',
+      stripe_account_id: stripeAccountId // Store Connect account ID
     })
 
     if (!trialUpdated) {
