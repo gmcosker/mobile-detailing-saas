@@ -206,6 +206,7 @@ export type Database = {
           id: string
           created_at: string
           email: string
+          first_name: string | null
           source: string
           subscribed: boolean
           notes: string | null
@@ -214,6 +215,7 @@ export type Database = {
           id?: string
           created_at?: string
           email: string
+          first_name?: string | null
           source?: string
           subscribed?: boolean
           notes?: string | null
@@ -222,6 +224,7 @@ export type Database = {
           id?: string
           created_at?: string
           email?: string
+          first_name?: string | null
           source?: string
           subscribed?: boolean
           notes?: string | null

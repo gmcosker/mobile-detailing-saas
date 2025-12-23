@@ -8,6 +8,7 @@ import SelfHostedVideo from '@/components/home/SelfHostedVideo'
 export default function HomePage() {
   const router = useRouter()
   const [showModal, setShowModal] = useState(false)
+  const [firstName, setFirstName] = useState('')
   const [email, setEmail] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modalState, setModalState] = useState<'form' | 'success' | 'error'>('form')
@@ -72,6 +73,7 @@ export default function HomePage() {
       e.preventDefault()
       setShowModal(true)
       setModalState('form')
+      setFirstName('')
       setEmail('')
       setErrorMessage('')
     }
@@ -82,6 +84,7 @@ export default function HomePage() {
     setShowModal(false)
     setTimeout(() => {
       setModalState('form')
+      setFirstName('')
       setEmail('')
       setErrorMessage('')
     }, 300)
@@ -89,12 +92,19 @@ export default function HomePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('[FORM] 🚀 handleSubmit called with email:', email)
+    
+    // Validate first name
+    if (!firstName || firstName.trim().length === 0) {
+      setErrorMessage('First name is required')
+      return
+    }
+    
+    console.log('[FORM] 🚀 handleSubmit called with firstName:', firstName, 'email:', email)
     setIsSubmitting(true)
     setErrorMessage('')
 
     try {
-      console.log('[FORM] Email submitted:', email)
+      console.log('[FORM] Form submitted:', { firstName, email })
       
       // Call the API to save the email
       console.log('[FORM] 📡 Calling /api/leads endpoint...')
@@ -104,6 +114,7 @@ export default function HomePage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          firstName: firstName.trim(),
           email: email,
           source: 'free_guide',
         }),
@@ -346,8 +357,16 @@ export default function HomePage() {
             {modalState === 'form' && (
               <>
                 <h3 className="text-2xl font-bold text-white mb-4 text-center">Download Your Free Guide</h3>
-                <p className="text-gray-400 mb-6 text-center">Enter your email to receive the guide instantly!</p>
+                <p className="text-gray-400 mb-6 text-center">Enter your name and email to receive the guide instantly!</p>
                 <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="p-3 rounded-lg bg-gray-700 text-white placeholder-gray-500 border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Your first name"
+                    required
+                  />
                   <input
                     type="email"
                     value={email}

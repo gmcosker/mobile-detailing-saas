@@ -5,7 +5,14 @@ import { sendfoxService } from '@/lib/sendfox'
 // POST /api/leads - Save email lead from free guide form
 export async function POST(request: NextRequest) {
   try {
-    const { email, source } = await request.json()
+    const { firstName, email, source } = await request.json()
+
+    if (!firstName || firstName.trim().length === 0) {
+      return NextResponse.json(
+        { success: false, error: 'First name is required' },
+        { status: 400 }
+      )
+    }
 
     if (!email) {
       return NextResponse.json(
@@ -34,6 +41,7 @@ export async function POST(request: NextRequest) {
     // Insert lead into database
     // Try simple insert first - if duplicate, handle gracefully
     const leadData = {
+      first_name: firstName.trim(),
       email: email.toLowerCase().trim(),
       source: source || 'free_guide',
       subscribed: true,
@@ -107,6 +115,7 @@ export async function POST(request: NextRequest) {
       try {
         console.log(`[LEADS] Attempting to add ${email} to SendFox list ${listId}`)
         const sendfoxResult = await sendfoxService.addSubscriber(email, listId, {
+          firstName: firstName.trim(),
           fields: {
             source: source || 'free_guide',
           },
