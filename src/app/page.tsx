@@ -89,14 +89,15 @@ export default function HomePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('[FORM] 🚀 handleSubmit called with email:', email)
     setIsSubmitting(true)
     setErrorMessage('')
 
     try {
-      console.log('Email submitted:', email)
+      console.log('[FORM] Email submitted:', email)
       
       // Call the API to save the email
-      console.log('[FORM] Calling /api/leads endpoint...')
+      console.log('[FORM] 📡 Calling /api/leads endpoint...')
       const response = await fetch('/api/leads', {
         method: 'POST',
         headers: {
