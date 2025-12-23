@@ -32,26 +32,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert lead into database
-    // Use upsert to handle duplicate emails gracefully
+    // Try simple insert first - if duplicate, handle gracefully
     const leadData = {
       email: email.toLowerCase().trim(),
       source: source || 'free_guide',
       subscribed: true,
     }
     
+    // First, try a simple insert
     const { data, error } = await supabase
       .from('leads')
-      .upsert(leadData as any, {
-        onConflict: 'email',
-        ignoreDuplicates: false, // Update if exists
-      })
+      .insert(leadData)
       .select()
       .single()
 
     if (error) {
       // If it's a duplicate, that's actually okay - we already have the lead
       if (error.code === '23505') {
-        console.log(`[LEADS] Email ${email} already exists in leads table`)
+        console.log(`[LEADS] Email ${email} already exists in leads table - that's fine`)
         return NextResponse.json({
           success: true,
           message: 'Email already registered',
@@ -65,8 +63,20 @@ export async function POST(request: NextRequest) {
         message: error.message,
         details: error.details,
         hint: error.hint,
-        fullError: error
+        fullError: JSON.stringify(error, null, 2)
       })
+      
+      // Check if table doesn't exist (common error code)
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        console.error('[LEADS] ❌❌❌ THE LEADS TABLE DOES NOT EXIST IN YOUR DATABASE! ❌❌❌')
+        console.error('[LEADS] You need to run the migration: database/migrations/add_leads_table.sql')
+      }
+      
+      // Check if RLS is blocking (common error)
+      if (error.code === '42501' || error.message?.includes('permission denied') || error.message?.includes('policy')) {
+        console.error('[LEADS] ❌❌❌ RLS POLICY IS BLOCKING THE INSERT! ❌❌❌')
+        console.error('[LEADS] Check that the "Allow public inserts for leads" policy exists in Supabase')
+      }
       
       return NextResponse.json(
         { 
