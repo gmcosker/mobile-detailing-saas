@@ -65,6 +65,8 @@ export const kitService = {
         requestBody.first_name = options.firstName
       }
 
+      // ConvertKit accepts tags as an array of tag IDs (numbers) or tag names (strings)
+      // If tags are provided, add them to the request
       if (options?.tags && options.tags.length > 0) {
         requestBody.tags = options.tags
       }

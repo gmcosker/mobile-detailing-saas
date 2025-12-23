@@ -33,19 +33,18 @@ export async function POST(request: NextRequest) {
 
     // Insert lead into database
     // Use upsert to handle duplicate emails gracefully
+    const leadData = {
+      email: email.toLowerCase().trim(),
+      source: source || 'free_guide',
+      subscribed: true,
+    }
+    
     const { data, error } = await supabase
       .from('leads')
-      .upsert(
-        {
-          email: email.toLowerCase().trim(),
-          source: source || 'free_guide',
-          subscribed: true,
-        },
-        {
-          onConflict: 'email',
-          ignoreDuplicates: false, // Update if exists
-        }
-      )
+      .upsert(leadData as any, {
+        onConflict: 'email',
+        ignoreDuplicates: false, // Update if exists
+      })
       .select()
       .single()
 
@@ -71,8 +70,19 @@ export async function POST(request: NextRequest) {
 
     // Add to ConvertKit for email nurture sequence
     const formId = process.env.CONVERTKIT_FORM_ID
-    if (formId) {
+    const apiKey = process.env.CONVERTKIT_API_KEY
+    
+    if (!apiKey) {
+      console.warn('[LEADS] ⚠️ CONVERTKIT_API_KEY not set in environment variables')
+    }
+    
+    if (!formId) {
+      console.warn('[LEADS] ⚠️ CONVERTKIT_FORM_ID not set in environment variables')
+    }
+    
+    if (formId && apiKey) {
       try {
+        console.log(`[LEADS] Attempting to add ${email} to ConvertKit form ${formId}`)
         const kitResult = await kitService.addSubscriber(email, formId, {
           tags: ['free_guide', source || 'website'],
           fields: {
@@ -81,17 +91,18 @@ export async function POST(request: NextRequest) {
         })
 
         if (kitResult.success) {
-          console.log(`[LEADS] Successfully added ${email} to ConvertKit`)
+          console.log(`[LEADS] ✅ Successfully added ${email} to ConvertKit - nurture sequence should start`)
         } else {
-          console.warn(`[LEADS] Failed to add ${email} to ConvertKit:`, kitResult.error)
+          console.error(`[LEADS] ❌ Failed to add ${email} to ConvertKit:`, kitResult.error)
           // Don't fail the request if Kit fails - we still saved the lead
         }
       } catch (kitError: any) {
-        console.error('[LEADS] Error adding to ConvertKit:', kitError)
+        console.error('[LEADS] ❌ Exception adding to ConvertKit:', kitError.message || kitError)
+        console.error('[LEADS] Full error:', kitError)
         // Continue even if Kit fails
       }
     } else {
-      console.log('[LEADS] ConvertKit form ID not configured, skipping Kit integration')
+      console.warn('[LEADS] ⚠️ ConvertKit not configured - missing API key or form ID. Nurture emails will NOT be sent.')
     }
 
     return NextResponse.json({

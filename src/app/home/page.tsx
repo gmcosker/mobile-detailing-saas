@@ -37,13 +37,27 @@ export default function HomePage() {
     setErrorMessage('')
 
     try {
-      // TODO: Integrate Firebase when config files are provided
-      // For now, just show success message
       console.log('Email submitted:', email)
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
+      // Call the API to save the email
+      const response = await fetch('/api/leads', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email,
+          source: 'free_guide',
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || 'Failed to save email')
+      }
+
+      console.log('Email saved successfully:', data)
       setModalState('success')
       setTimeout(() => {
         handleCloseModal()
@@ -51,7 +65,7 @@ export default function HomePage() {
     } catch (error: any) {
       console.error('Error submitting email:', error)
       setModalState('error')
-      setErrorMessage('Could not save your email. Please try again.')
+      setErrorMessage(error.message || 'Could not save your email. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
