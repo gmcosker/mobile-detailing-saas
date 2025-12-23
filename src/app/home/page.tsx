@@ -40,6 +40,7 @@ export default function HomePage() {
       console.log('Email submitted:', email)
       
       // Call the API to save the email
+      console.log('[FORM] Calling /api/leads endpoint...')
       const response = await fetch('/api/leads', {
         method: 'POST',
         headers: {
@@ -51,19 +52,28 @@ export default function HomePage() {
         }),
       })
 
+      console.log('[FORM] Response status:', response.status, response.statusText)
+      
       const data = await response.json()
+      console.log('[FORM] Response data:', data)
 
       if (!response.ok || !data.success) {
+        console.error('[FORM] API returned error:', data.error)
         throw new Error(data.error || 'Failed to save email')
       }
 
-      console.log('Email saved successfully:', data)
+      console.log('[FORM] ✅ Email saved successfully:', data)
       setModalState('success')
       setTimeout(() => {
         handleCloseModal()
       }, 2500)
     } catch (error: any) {
-      console.error('Error submitting email:', error)
+      console.error('[FORM] ❌ Error submitting email:', error)
+      console.error('[FORM] Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      })
       setModalState('error')
       setErrorMessage(error.message || 'Could not save your email. Please try again.')
     } finally {
