@@ -1,5 +1,60 @@
 # Tomorrow's Tasks - Game Plan
 
+## 🚨 PRIORITY: Fix Broken Email Capture Form
+
+### Problem
+Email capture form on homepage (`/` and `/home`) is returning 500 error when submitting emails. The form used to work but is now broken.
+
+### What Happened
+- Form calls `/api/leads` endpoint correctly ✅
+- API endpoint exists and has correct code ✅
+- Database table `leads` exists (confirmed in Supabase) ✅
+- **But inserts are failing with 500 error** ❌
+
+### Root Cause (Likely)
+1. **RLS Policy Issue**: The "Allow public inserts for leads" policy may not exist or may be misconfigured
+2. **Environment Variables**: Vercel may have wrong Supabase URL/key pointing to different database
+3. **Code Change**: Something in the recent code changes broke the insert logic
+
+### Steps to Fix
+1. **Check Vercel Function Logs**:
+   - Go to Vercel → Latest Deployment → Function Logs
+   - Submit a test email
+   - Look for the actual database error message
+   - This will tell us exactly what's wrong
+
+2. **Verify RLS Policy in Supabase**:
+   - Go to Supabase → Table Editor → `leads` table
+   - Click "2 RLS policies"
+   - Verify "Allow public inserts for leads" exists and allows `INSERT` for `public`
+   - If missing, create it:
+     ```sql
+     CREATE POLICY "Allow public inserts for leads" ON leads 
+         FOR INSERT 
+         TO public 
+         WITH CHECK (true);
+     ```
+
+3. **Verify Vercel Environment Variables**:
+   - Go to Vercel → Settings → Environment Variables
+   - Check `NEXT_PUBLIC_SUPABASE_URL` matches your Supabase project
+   - Check `NEXT_PUBLIC_SUPABASE_ANON_KEY` is correct
+   - These must match the database where the `leads` table exists
+
+4. **Test After Fix**:
+   - Submit test email on production site
+   - Check Vercel logs for success
+   - Verify email appears in Supabase `leads` table
+
+### Files Involved
+- `src/app/api/leads/route.ts` - API endpoint
+- `src/app/page.tsx` - Homepage form
+- `src/app/home/page.tsx` - /home page form
+- Vercel Environment Variables
+- Supabase RLS Policies
+
+---
+
 ## 🎯 Task 1: Fix ConvertKit Nurture Sequence Emails
 
 ### Problem
@@ -190,6 +245,14 @@ If you want to test webhooks locally:
 ---
 
 ## 📋 Summary Checklist
+
+### Email Capture Fix (PRIORITY):
+- [ ] Check Vercel function logs for actual error message
+- [ ] Verify RLS policy exists and allows public inserts
+- [ ] Verify Vercel env vars match Supabase project
+- [ ] Test email submission on production
+- [ ] Confirm email appears in `leads` table
+- [ ] Mark as complete ✅
 
 ### ConvertKit Fix:
 - [ ] Run diagnostic endpoint: `/api/leads/test-kit`

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseClient } from '@/lib/supabase'
-import { kitService } from '@/lib/kit'
+import { sendfoxService } from '@/lib/sendfox'
 
 // POST /api/leads - Save email lead from free guide form
 export async function POST(request: NextRequest) {
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     // First, try a simple insert
     const { data, error } = await supabase
       .from('leads')
-      .insert(leadData)
+      .insert(leadData as any)
       .select()
       .single()
 
@@ -91,41 +91,40 @@ export async function POST(request: NextRequest) {
 
     console.log(`[LEADS] Successfully saved lead: ${email}`)
 
-    // Add to ConvertKit for email nurture sequence
-    const formId = process.env.CONVERTKIT_FORM_ID
-    const apiKey = process.env.CONVERTKIT_API_KEY
+    // Add to SendFox for email marketing
+    const listId = process.env.SENDFOX_LIST_ID
+    const apiToken = process.env.SENDFOX_API_TOKEN
     
-    if (!apiKey) {
-      console.warn('[LEADS] ⚠️ CONVERTKIT_API_KEY not set in environment variables')
+    if (!apiToken) {
+      console.warn('[LEADS] ⚠️ SENDFOX_API_TOKEN not set in environment variables')
     }
     
-    if (!formId) {
-      console.warn('[LEADS] ⚠️ CONVERTKIT_FORM_ID not set in environment variables')
+    if (!listId) {
+      console.warn('[LEADS] ⚠️ SENDFOX_LIST_ID not set in environment variables')
     }
     
-    if (formId && apiKey) {
+    if (listId && apiToken) {
       try {
-        console.log(`[LEADS] Attempting to add ${email} to ConvertKit form ${formId}`)
-        const kitResult = await kitService.addSubscriber(email, formId, {
-          tags: ['free_guide', source || 'website'],
+        console.log(`[LEADS] Attempting to add ${email} to SendFox list ${listId}`)
+        const sendfoxResult = await sendfoxService.addSubscriber(email, listId, {
           fields: {
             source: source || 'free_guide',
           },
         })
 
-        if (kitResult.success) {
-          console.log(`[LEADS] ✅ Successfully added ${email} to ConvertKit - nurture sequence should start`)
+        if (sendfoxResult.success) {
+          console.log(`[LEADS] ✅ Successfully added ${email} to SendFox - email marketing sequence should start`)
         } else {
-          console.error(`[LEADS] ❌ Failed to add ${email} to ConvertKit:`, kitResult.error)
-          // Don't fail the request if Kit fails - we still saved the lead
+          console.error(`[LEADS] ❌ Failed to add ${email} to SendFox:`, sendfoxResult.error)
+          // Don't fail the request if SendFox fails - we still saved the lead
         }
-      } catch (kitError: any) {
-        console.error('[LEADS] ❌ Exception adding to ConvertKit:', kitError.message || kitError)
-        console.error('[LEADS] Full error:', kitError)
-        // Continue even if Kit fails
+      } catch (sendfoxError: any) {
+        console.error('[LEADS] ❌ Exception adding to SendFox:', sendfoxError.message || sendfoxError)
+        console.error('[LEADS] Full error:', sendfoxError)
+        // Continue even if SendFox fails
       }
     } else {
-      console.warn('[LEADS] ⚠️ ConvertKit not configured - missing API key or form ID. Nurture emails will NOT be sent.')
+      console.warn('[LEADS] ⚠️ SendFox not configured - missing API token or list ID. Marketing emails will NOT be sent.')
     }
 
     return NextResponse.json({
