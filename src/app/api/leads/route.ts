@@ -59,9 +59,22 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      console.error('[LEADS] Error saving lead:', error)
+      // Log the full error details for debugging
+      console.error('[LEADS] ❌ Database error saving lead:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        fullError: error
+      })
+      
       return NextResponse.json(
-        { success: false, error: 'Failed to save email' },
+        { 
+          success: false, 
+          error: 'Failed to save email',
+          details: error.message || 'Database error',
+          code: error.code
+        },
         { status: 500 }
       )
     }
