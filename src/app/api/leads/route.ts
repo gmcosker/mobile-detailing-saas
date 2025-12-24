@@ -87,19 +87,22 @@ export async function POST(request: NextRequest) {
       }
       
       // Return the actual error so we can see what's wrong
+      const errorMessage = error.message || error.details || error.hint || 'Database error'
+      const errorCode = error.code || 'UNKNOWN'
+      
       return NextResponse.json(
         { 
           success: false, 
-          error: error.message || 'Failed to save email',
-          details: error.details || error.hint || 'Database error',
-          code: error.code,
-          // Include full error for debugging
-          debug: process.env.NODE_ENV === 'development' ? {
+          error: `${errorMessage} (Code: ${errorCode})`,
+          details: error.details || error.hint || errorMessage,
+          code: errorCode,
+          // Always include debug info so we can see what's wrong
+          debug: {
             code: error.code,
             message: error.message,
             details: error.details,
             hint: error.hint
-          } : undefined
+          }
         },
         { status: 500 }
       )
