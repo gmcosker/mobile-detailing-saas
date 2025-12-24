@@ -71,11 +71,8 @@ export default function HomePage() {
   const handleCTAClick = (e: React.MouseEvent, isHeroButton: boolean) => {
     if (isHeroButton) {
       e.preventDefault()
-      setShowModal(true)
-      setModalState('form')
-      setFirstName('')
-      setEmail('')
-      setErrorMessage('')
+      // Redirect to SendFox landing page
+      window.location.href = 'https://sendfox.com/lp/3l485l'
     }
     // Other buttons will navigate via Link
   }
