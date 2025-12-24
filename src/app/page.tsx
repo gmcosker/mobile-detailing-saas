@@ -123,12 +123,13 @@ export default function HomePage() {
       console.log('[FORM] Response status:', response.status, response.statusText)
       
       const data = await response.json()
-      console.log('[FORM] Response data:', data)
+      console.log('[FORM] Response data:', JSON.stringify(data, null, 2))
 
       if (!response.ok || !data.success) {
-        console.error('[FORM] API returned error:', data)
+        console.error('[FORM] API returned error:', JSON.stringify(data, null, 2))
         // Show the actual error message from the server
-        const errorMsg = data.details || data.error || 'Failed to save email'
+        const errorMsg = data.error || data.details || data.debug?.message || 'Failed to save email'
+        console.error('[FORM] Full error object:', data.debug || data)
         throw new Error(errorMsg)
       }
 
