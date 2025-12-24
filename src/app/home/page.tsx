@@ -69,8 +69,10 @@ export default function HomePage() {
       console.log('[FORM] Response data:', data)
 
       if (!response.ok || !data.success) {
-        console.error('[FORM] API returned error:', data.error)
-        throw new Error(data.error || 'Failed to save email')
+        console.error('[FORM] API returned error:', data)
+        // Show the actual error message from the server
+        const errorMsg = data.details || data.error || 'Failed to save email'
+        throw new Error(errorMsg)
       }
 
       console.log('[FORM] ✅ Email saved successfully:', data)

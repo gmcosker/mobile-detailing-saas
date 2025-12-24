@@ -86,12 +86,20 @@ export async function POST(request: NextRequest) {
         console.error('[LEADS] Check that the "Allow public inserts for leads" policy exists in Supabase')
       }
       
+      // Return the actual error so we can see what's wrong
       return NextResponse.json(
         { 
           success: false, 
-          error: 'Failed to save email',
-          details: error.message || 'Database error',
-          code: error.code
+          error: error.message || 'Failed to save email',
+          details: error.details || error.hint || 'Database error',
+          code: error.code,
+          // Include full error for debugging
+          debug: process.env.NODE_ENV === 'development' ? {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint
+          } : undefined
         },
         { status: 500 }
       )
