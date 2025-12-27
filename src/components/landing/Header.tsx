@@ -13,11 +13,13 @@ export default function Header() {
       className="py-4 px-6 md:px-12 fixed top-0 left-0 right-0 bg-background/80 backdrop-blur-xl z-50 border-b border-border/50"
     >
       <div className="container mx-auto flex justify-between items-center">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">DF</span>
-          </div>
-          <span className="text-xl font-bold text-foreground">DetailFlow</span>
+        <Link href="/" className="flex items-center gap-3">
+          <img 
+            src="/icons/ios/1024.png" 
+            alt="DetailFlow Logo" 
+            className="w-10 h-10 rounded-lg"
+          />
+          <span className="text-2xl font-bold text-foreground">DetailFlow</span>
         </Link>
         <Button variant="nav" size="default" asChild>
           <Link href="/login">Get Started Free</Link>
