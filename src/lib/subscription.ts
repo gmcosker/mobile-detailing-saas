@@ -46,13 +46,13 @@ export async function checkSubscriptionStatus(detailerId: string): Promise<Subsc
         subscriptionPlan: null
       }
     }
-    uuid = (detailer as { id: string }).id
+    uuid = detailer.id
   }
 
   // Fetch detailer with subscription fields
   const { data: detailer, error } = await supabase
     .from('detailers')
-    .select('id, subscription_status, trial_ends_at, subscription_ends_at, subscription_plan')
+    .select('subscription_status, trial_ends_at, subscription_ends_at, subscription_plan')
     .eq('id', uuid)
     .single()
 
@@ -71,63 +71,10 @@ export async function checkSubscriptionStatus(detailerId: string): Promise<Subsc
     }
   }
 
-  // Type assertion for detailer data
-  const detailerData = detailer as {
-    id: string
-    subscription_status: string | null
-    trial_ends_at: string | null
-    subscription_ends_at: string | null
-    subscription_plan: string | null
-  }
-
-  const status = (detailerData.subscription_status as SubscriptionStatus) || null
-  const trialEndsAt = detailerData.trial_ends_at ? new Date(detailerData.trial_ends_at) : null
-  const subscriptionEndsAt = detailerData.subscription_ends_at ? new Date(detailerData.subscription_ends_at) : null
-  const subscriptionPlan = detailerData.subscription_plan || null
-
-  // Handle accounts created before migration (no trial dates but status is 'trial')
-  // OR accounts with trial status but trial_ends_at is in the past
-  if (status === 'trial') {
-    if (!trialEndsAt) {
-      // Account created before migration - no trial dates, expire it
-      console.warn('Account has trial status but no trial_ends_at - created before migration, expiring now')
-      await detailerService.update(uuid, { subscription_status: 'expired' })
-      return {
-        status: 'expired',
-        daysLeft: 0,
-        trialEndsAt: null,
-        subscriptionEndsAt: null,
-        subscriptionPlan: null
-      }
-    } else {
-      // Check if trial has ended
-      const daysLeft = getDaysRemaining(trialEndsAt)
-      if (daysLeft <= 0) {
-        // Trial has ended - update to expired
-        await detailerService.update(uuid, { subscription_status: 'expired' })
-        return {
-          status: 'expired',
-          daysLeft: 0,
-          trialEndsAt,
-          subscriptionEndsAt: null,
-          subscriptionPlan: null
-        }
-      }
-      // Trial still active
-      return {
-        status: 'trial',
-        daysLeft,
-        trialEndsAt,
-        subscriptionEndsAt: null,
-        subscriptionPlan: null
-      }
-    }
-  }
-
-  // Handle accounts with no status and no trial dates (created before migration)
-  if (!status && !trialEndsAt) {
-    console.warn('Account has no subscription status or trial dates - created before migration, marking as expired')
-    await detailerService.update(uuid, { subscription_status: 'expired' })
+  // Handle accounts created before migration (no trial dates)
+  if (!detailer.trial_ends_at && !detailer.subscription_status) {
+    console.warn('Account has no trial dates - created before migration')
+    // Treat as expired if no trial dates exist
     return {
       status: 'expired',
       daysLeft: null,
@@ -137,9 +84,27 @@ export async function checkSubscriptionStatus(detailerId: string): Promise<Subsc
     }
   }
 
-  // Calculate days left for active subscriptions
+  const status = (detailer.subscription_status as SubscriptionStatus) || 'expired'
+  const trialEndsAt = detailer.trial_ends_at ? new Date(detailer.trial_ends_at) : null
+  const subscriptionEndsAt = detailer.subscription_ends_at ? new Date(detailer.subscription_ends_at) : null
+  const subscriptionPlan = detailer.subscription_plan || null
+
+  // Calculate days left
   let daysLeft: number | null = null
-  if (status === 'active' && subscriptionEndsAt) {
+  if (status === 'trial' && trialEndsAt) {
+    daysLeft = getDaysRemaining(trialEndsAt)
+    // Auto-update to expired if trial has ended
+    if (daysLeft <= 0) {
+      await detailerService.update(uuid, { subscription_status: 'expired' })
+      return {
+        status: 'expired',
+        daysLeft: 0,
+        trialEndsAt,
+        subscriptionEndsAt: null,
+        subscriptionPlan: null
+      }
+    }
+  } else if (status === 'active' && subscriptionEndsAt) {
     daysLeft = getDaysRemaining(subscriptionEndsAt)
     // Auto-update to expired if subscription has ended
     if (daysLeft <= 0) {

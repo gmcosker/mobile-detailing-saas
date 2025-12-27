@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
 import { X, Lock, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -14,10 +13,9 @@ interface PaywallModalProps {
 
 const pricingPlans = [
   {
-    id: 'starter',
     name: 'Starter',
     price: 17,
-    billingLabel: 'month',
+    priceId: process.env.NEXT_PUBLIC_STRIPE_STARTER_PRICE_ID || 'price_starter',
     features: [
       'Up to 50 customers',
       'Unlimited appointments',
@@ -28,10 +26,9 @@ const pricingPlans = [
     ]
   },
   {
-    id: 'professional',
     name: 'Professional',
     price: 79,
-    billingLabel: 'month',
+    priceId: process.env.NEXT_PUBLIC_STRIPE_PROFESSIONAL_PRICE_ID || 'price_professional',
     recommended: true,
     features: [
       'Unlimited customers',
@@ -45,10 +42,9 @@ const pricingPlans = [
     ]
   },
   {
-    id: 'business',
     name: 'Business',
     price: 149,
-    billingLabel: 'month',
+    priceId: process.env.NEXT_PUBLIC_STRIPE_BUSINESS_PRICE_ID || 'price_business',
     features: [
       'Everything in Professional',
       'Multi-user access',
@@ -56,17 +52,6 @@ const pricingPlans = [
       'White-label options',
       'Dedicated support',
       'Custom integrations'
-    ]
-  },
-  {
-    id: 'lifetime',
-    name: 'Lifetime Deal',
-    price: 300,
-    billingLabel: 'one-time',
-    features: [
-      'Everything in Professional',
-      'Lifetime access (no renewals)',
-      'One-time payment'
     ]
   }
 ]
@@ -76,13 +61,6 @@ export default function PaywallModal({ detailerId, onClose }: PaywallModalProps)
     status: string
   } | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isProcessing, setIsProcessing] = useState<string | null>(null)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-    return () => setMounted(false)
-  }, [])
 
   useEffect(() => {
     const fetchSubscription = async () => {
@@ -107,43 +85,14 @@ export default function PaywallModal({ detailerId, onClose }: PaywallModalProps)
     return null
   }
 
-  if (!mounted) return null
-
-  const handleSelectPlan = async (planId: string) => {
-    setIsProcessing(planId)
-
-    try {
-      const token = localStorage.getItem('auth_token')
-      const response = await fetch('/api/subscriptions/create-checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` }),
-        },
-        body: JSON.stringify({
-          planId,
-          detailerId: detailerId || null,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (response.ok && data.success && data.checkoutUrl) {
-        window.location.href = data.checkoutUrl
-      } else {
-        alert(data.error || 'Failed to create checkout session. Please try again.')
-        setIsProcessing(null)
-      }
-    } catch (error) {
-      console.error('Error creating checkout session:', error)
-      alert('An error occurred. Please try again.')
-      setIsProcessing(null)
-    }
+  const handleUpgrade = (planName: string) => {
+    // Redirect to upgrade page with plan selection
+    window.location.href = `/upgrade?plan=${planName.toLowerCase()}`
   }
 
-  const modalContent = (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4" style={{ zIndex: 99999 }}>
-      <div className="bg-background rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto mx-auto my-auto">
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-background rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-background border-b border-border px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -176,9 +125,9 @@ export default function PaywallModal({ detailerId, onClose }: PaywallModalProps)
 
           {/* Pricing Cards */}
           <div className="grid md:grid-cols-3 gap-6 mb-6">
-            {pricingPlans.filter(p => p.id !== 'lifetime').map((plan) => (
+            {pricingPlans.map((plan) => (
               <div
-                key={plan.id}
+                key={plan.name}
                 className={`relative border-2 rounded-lg p-6 ${
                   plan.recommended
                     ? 'border-primary bg-primary/5'
@@ -197,7 +146,7 @@ export default function PaywallModal({ detailerId, onClose }: PaywallModalProps)
                   <h3 className="text-xl font-bold text-foreground mb-2">{plan.name}</h3>
                   <div className="flex items-baseline justify-center gap-1">
                     <span className="text-3xl font-bold text-foreground">${plan.price}</span>
-                    <span className="text-muted-foreground">/{plan.billingLabel}</span>
+                    <span className="text-muted-foreground">/month</span>
                   </div>
                 </div>
 
@@ -211,53 +160,14 @@ export default function PaywallModal({ detailerId, onClose }: PaywallModalProps)
                 </ul>
 
                 <Button
-                  onClick={() => handleSelectPlan(plan.id)}
+                  onClick={() => handleUpgrade(plan.name)}
                   className="w-full"
                   variant={plan.recommended ? 'default' : 'outline'}
-                  disabled={isProcessing === plan.id}
                 >
-                  {isProcessing === plan.id ? 'Processing...' : `Select ${plan.name}`}
+                  Select {plan.name}
                 </Button>
               </div>
             ))}
-          </div>
-
-          {/* Lifetime Deal - Centered below Professional */}
-          <div className="grid md:grid-cols-3 gap-6 mb-6">
-            <div></div>
-            {pricingPlans.filter(p => p.id === 'lifetime').map((plan) => (
-              <div
-                key={plan.id}
-                className="relative border-2 rounded-lg p-6 border-border bg-card"
-              >
-                <div className="text-center mb-6">
-                  <h3 className="text-xl font-bold text-foreground mb-2">{plan.name}</h3>
-                  <div className="flex items-baseline justify-center gap-1">
-                    <span className="text-3xl font-bold text-foreground">${plan.price}</span>
-                    <span className="text-muted-foreground">/{plan.billingLabel}</span>
-                  </div>
-                </div>
-
-                <ul className="space-y-3 mb-6">
-                  {plan.features.map((feature, index) => (
-                    <li key={index} className="flex items-start gap-2">
-                      <Check className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                      <span className="text-sm text-foreground">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <Button
-                  onClick={() => handleSelectPlan(plan.id)}
-                  className="w-full"
-                  variant="outline"
-                  disabled={isProcessing === plan.id}
-                >
-                  {isProcessing === plan.id ? 'Processing...' : `Select ${plan.name}`}
-                </Button>
-              </div>
-            ))}
-            <div></div>
           </div>
 
           <div className="text-center text-sm text-muted-foreground">
@@ -267,7 +177,5 @@ export default function PaywallModal({ detailerId, onClose }: PaywallModalProps)
       </div>
     </div>
   )
-
-  return createPortal(modalContent, document.body)
 }
 

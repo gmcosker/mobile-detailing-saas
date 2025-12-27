@@ -109,11 +109,18 @@ export async function POST(
     )
     
     if (!result.success) {
+      console.error('[BOOKING-INVITE] SMS send failed:', result.error)
       return NextResponse.json(
-        { success: false, error: result.error || 'Failed to send SMS' },
+        { 
+          success: false, 
+          error: result.error || 'Failed to send SMS',
+          details: result.error
+        },
         { status: 500 }
       )
     }
+    
+    console.log('[BOOKING-INVITE] SMS sent successfully. Message ID:', result.messageId)
 
     // Update customer's last_booking_invite_sent_at timestamp
     // Reuse the supabase client we already have

@@ -613,12 +613,8 @@ function CustomerRow({ customer, onClick }: { customer: any; onClick: () => void
 
   return (
     <button
-      type="button"
-      onClick={(e) => {
-        // The MoreHorizontal button will stop propagation, so this will only fire for row clicks
-        onClick()
-      }}
-      className="w-full text-left p-4 sm:p-5 hover:bg-accent/50 active:bg-accent transition-colors min-h-[100px] sm:min-h-0 cursor-pointer relative"
+      onClick={onClick}
+      className="w-full text-left p-4 sm:p-5 hover:bg-accent/50 active:bg-accent transition-colors min-h-[100px] sm:min-h-0"
     >
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
         <div className="flex-1 min-w-0">
@@ -689,19 +685,7 @@ function CustomerRow({ customer, onClick }: { customer: any; onClick: () => void
             <div className="text-xs sm:text-sm text-muted-foreground">Total Spent</div>
           </div>
           
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-11 w-11 sm:h-10 sm:w-10 flex-shrink-0" 
-            onClick={(e) => { 
-              e.preventDefault()
-              e.stopPropagation()
-              onClick()
-            }}
-            type="button"
-            data-menu-button="true"
-            style={{ pointerEvents: 'auto', zIndex: 10, position: 'relative' }}
-          >
+          <Button variant="ghost" size="icon" className="h-11 w-11 sm:h-10 sm:w-10 flex-shrink-0" onClick={(e) => { e.stopPropagation(); onClick(); }}>
             <MoreHorizontal className="h-5 w-5 sm:h-4 sm:w-4" />
           </Button>
         </div>

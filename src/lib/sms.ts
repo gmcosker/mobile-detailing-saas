@@ -1,37 +1,47 @@
 import { getSupabaseClient } from '@/lib/supabase'
+import { SNSClient, PublishCommand } from '@aws-sdk/client-sns'
 
-// Vonage/Nexmo client will be initialized only on server-side
-let vonageClient: any = null
+// AWS SNS client will be initialized only on server-side
+let snsClient: SNSClient | null = null
 
-// Initialize Vonage client (server-side only)
-async function getVonageClient() {
+// Initialize AWS SNS client (server-side only)
+function getSNSClient(): SNSClient | null {
   if (typeof window !== 'undefined') {
-    // We're on the client side, don't initialize Vonage
+    // We're on the client side, don't initialize SNS
     return null
   }
   
-  if (!vonageClient) {
+  if (!snsClient) {
     try {
-      const { Vonage } = await import('@vonage/server-sdk')
-      const apiKey = process.env.NEXMO_API_KEY || process.env.VONAGE_API_KEY
-      const apiSecret = process.env.NEXMO_API_SECRET_KEY || process.env.VONAGE_API_SECRET_KEY
+      const accessKeyId = process.env.AWS_ACCESS_KEY_ID
+      const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY
+      const region = process.env.AWS_REGION || 'us-east-1'
       
-      if (!apiKey || !apiSecret) {
-        console.log('Vonage credentials not configured')
+      if (!accessKeyId || !secretAccessKey) {
+        console.log('[SMS] AWS SNS credentials not configured, using demo mode')
         return null
       }
       
-      vonageClient = new Vonage({ apiKey, apiSecret })
+      snsClient = new SNSClient({
+        region,
+        credentials: {
+          accessKeyId,
+          secretAccessKey,
+        },
+      })
+      
+      console.log('[SMS] AWS SNS client initialized successfully')
     } catch (error) {
-      console.log('Vonage not available, using demo mode')
+      console.error('[SMS] Error initializing AWS SNS client:', error)
       return null
     }
   }
   
-  return vonageClient
+  return snsClient
 }
 
-const nexmoPhoneNumber = process.env.NEXMO_PHONE_NUMBER || process.env.VONAGE_PHONE_NUMBER || '+1234567890'
+// Use Sender ID (preferred) or phone number as fallback
+const senderId = process.env.AWS_SNS_SENDER_ID || process.env.AWS_SNS_PHONE_NUMBER || 'DetailFlow'
 
 // SMS Templates
 export const smsTemplates = {
@@ -171,24 +181,22 @@ export const smsService = {
         }
       }
 
-      // Send immediately
-      const client = await getVonageClient()
+      // Send immediately using AWS SNS
+      const client = getSNSClient()
       if (!client) {
-        // Check if credentials are missing
-        const hasApiKey = process.env.NEXMO_API_KEY || process.env.VONAGE_API_KEY
-        const hasApiSecret = process.env.NEXMO_API_SECRET_KEY || process.env.VONAGE_API_SECRET_KEY
-        const hasPhoneNumber = process.env.NEXMO_PHONE_NUMBER || process.env.VONAGE_PHONE_NUMBER
+        // Check if AWS credentials are missing
+        const hasAccessKey = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_ACCESS_KEY_ID.trim() !== ''
+        const hasSecretKey = process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_SECRET_ACCESS_KEY.trim() !== ''
         
-        if (!hasApiKey || !hasApiSecret || !hasPhoneNumber) {
-          console.warn('[SMS] Vonage credentials not configured. Missing:', {
-            apiKey: !hasApiKey,
-            apiSecret: !hasApiSecret,
-            phoneNumber: !hasPhoneNumber
+        if (!hasAccessKey || !hasSecretKey) {
+          console.warn('[SMS] AWS SNS credentials not configured. Missing:', {
+            accessKeyId: !hasAccessKey,
+            secretAccessKey: !hasSecretKey
           })
           console.log(`[DEMO MODE] SMS would be sent: ${message} to ${formattedPhone}`)
           return {
             success: false,
-            error: 'Vonage credentials not configured. Please add NEXMO_API_KEY, NEXMO_API_SECRET_KEY, and NEXMO_PHONE_NUMBER to your environment variables.',
+            error: 'AWS SNS credentials not configured. Please add AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION to your environment variables.',
             messageId: `demo_${Date.now()}`,
           }
         }
@@ -196,46 +204,67 @@ export const smsService = {
         // Demo mode - simulate success
         console.log(`[DEMO MODE] SMS would be sent: ${message} to ${formattedPhone}`)
         return {
-          success: true,
+          success: false,
+          error: 'AWS SNS client initialization failed. Check your credentials and region.',
           messageId: `demo_${Date.now()}`,
         }
       }
 
-      console.log(`[SMS] Attempting to send SMS to ${formattedPhone} from ${nexmoPhoneNumber} (Detailer: ${detailerId})`)
+      console.log(`[SMS] Attempting to send SMS via AWS SNS to ${formattedPhone} (Detailer: ${detailerId})`)
       console.log(`[SMS] Original phone number: "${to}", Cleaned: "${cleanPhone}", Formatted: "${formattedPhone}"`)
+      console.log(`[SMS] Sender ID: ${senderId}`)
       
-      const response = await client.sms.send({
-        to: formattedPhone,
-        from: nexmoPhoneNumber,
-        text: message,
+      // AWS SNS PublishCommand
+      const command = new PublishCommand({
+        PhoneNumber: formattedPhone,
+        Message: message,
+        MessageAttributes: {
+          'AWS.SNS.SMS.SenderID': {
+            DataType: 'String',
+            StringValue: options?.businessName || senderId,
+          },
+        },
       })
 
-      if (response.messages && response.messages[0].status === '0') {
-        console.log(`[SMS] Successfully sent SMS. Message ID: ${response.messages[0]['message-id']}`)
-        return {
-          success: true,
-          messageId: response.messages[0]['message-id'],
-        }
-      } else {
-        throw new Error(response.messages?.[0]['error-text'] || 'Failed to send SMS')
+      const result = await client.send(command)
+
+      console.log(`[SMS] Successfully sent SMS via AWS SNS. Message ID: ${result.MessageId}`)
+      console.log(`[SMS] Response:`, JSON.stringify(result, null, 2))
+      
+      return {
+        success: true,
+        messageId: result.MessageId || `aws_${Date.now()}`,
       }
     } catch (error: any) {
       console.error(`[SMS] Error sending SMS for detailer ${detailerId}:`, error)
       console.error('[SMS] Error details:', {
         message: error.message,
+        name: error.name,
         code: error.code,
-        status: error.status,
-        moreInfo: error.moreInfo,
+        statusCode: error.$metadata?.httpStatusCode,
+        requestId: error.$metadata?.requestId,
         detailerId
       })
       
-      // For demo purposes, simulate success when Vonage credentials aren't real
-      if (process.env.NODE_ENV === 'development' && !process.env.NEXMO_API_KEY && !process.env.VONAGE_API_KEY) {
-        console.log(`[DEMO MODE] SMS would be sent: ${message} to ${to} (Detailer: ${detailerId})`)
+      // Check for specific AWS errors
+      if (error.name === 'InvalidParameterException') {
         return {
           success: false,
-          error: 'Vonage credentials not configured',
-          messageId: `demo_${Date.now()}`,
+          error: `Invalid phone number format: ${to}. Please use E.164 format (e.g., +1234567890)`,
+        }
+      }
+      
+      if (error.name === 'ThrottlingException') {
+        return {
+          success: false,
+          error: 'AWS SNS rate limit exceeded. Please try again in a moment.',
+        }
+      }
+      
+      if (error.name === 'AuthorizationErrorException' || error.code === 'SignatureDoesNotMatch') {
+        return {
+          success: false,
+          error: 'AWS SNS authentication failed. Please check your AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.',
         }
       }
 
@@ -438,18 +467,21 @@ export const smsService = {
   },
 
   // Get SMS delivery status (for tracking)
+  // Note: AWS SNS doesn't provide message status tracking like Twilio
+  // This returns a generic status based on message ID format
   async getSMSStatus(messageId: string): Promise<{ status: string; error?: string }> {
     try {
       if (messageId.startsWith('demo_') || messageId.startsWith('scheduled_')) {
+        return { status: 'pending' }
+      }
+
+      if (messageId.startsWith('aws_')) {
+        // AWS SNS doesn't provide delivery status via API
+        // Messages are typically delivered within seconds
         return { status: 'delivered' }
       }
 
-      const client = await getVonageClient()
-      if (!client) {
-        return { status: 'delivered' } // Demo mode
-      }
-
-      // Vonage doesn't have a direct message status API like Twilio
+      // For AWS MessageId format, assume delivered
       // In production, you'd track this in your database
       return { status: 'delivered' }
     } catch (error: any) {
@@ -458,50 +490,19 @@ export const smsService = {
   },
 
   // Get SMS history for a phone number
+  // Note: AWS SNS doesn't provide message history like Twilio
+  // This would need to be tracked in your database
   async getSMSHistory(phoneNumber: string, limit: number = 10) {
     try {
-      const client = await getVonageClient()
-      if (!client) {
-        // Return mock data for demo
-        return [
-          {
-            id: 'demo_1',
-            body: 'Hi John! This is a reminder that your Full Detail appointment is tomorrow at 2:00 PM.',
-            status: 'delivered',
-            dateSent: new Date(Date.now() - 24 * 60 * 60 * 1000),
-            direction: 'outbound-api',
-            errorMessage: null
-          }
-        ]
-      }
-
-      const messages = await client.messages.list({
-        to: phoneNumber,
-        limit: limit
-      })
-
-      return messages.map(msg => ({
-        id: msg.sid,
-        body: msg.body,
-        status: msg.status,
-        dateSent: msg.dateSent,
-        direction: msg.direction,
-        errorMessage: msg.errorMessage
-      }))
+      // AWS SNS doesn't have a message history API
+      // In production, you should track sent messages in your database
+      console.warn('[SMS] SMS history not available with AWS SNS. Track messages in your database.')
+      
+      // Return empty array - implement database tracking for production
+      return []
     } catch (error: any) {
       console.error('Error fetching SMS history:', error)
-      
-      // Return mock data for demo
-      return [
-        {
-          id: 'demo_1',
-          body: 'Hi John! This is a reminder that your Full Detail appointment is tomorrow at 2:00 PM.',
-          status: 'delivered',
-          dateSent: new Date(Date.now() - 24 * 60 * 60 * 1000),
-          direction: 'outbound-api',
-          errorMessage: null
-        }
-      ]
+      return []
     }
   }
 }

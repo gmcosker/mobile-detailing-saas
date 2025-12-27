@@ -1,7 +1,7 @@
 'use client'
 
 import { ReactNode, useState, useEffect } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { 
   Calendar,
@@ -14,7 +14,7 @@ import {
   Settings,
   Tag,
   LogOut,
-  TrendingUp
+  Zap
 } from 'lucide-react'
 import PaywallModal from '@/components/subscription/PaywallModal'
 import { checkSubscriptionStatus, hasActiveAccess } from '@/lib/subscription'
@@ -22,11 +22,11 @@ import { checkSubscriptionStatus, hasActiveAccess } from '@/lib/subscription'
 interface DashboardLayoutProps {
   children: ReactNode
   title?: string
+  skipPaywall?: boolean // Allow pages to skip paywall check (e.g., upgrade page)
 }
 
-export default function DashboardLayout({ children, title = "Dashboard" }: DashboardLayoutProps) {
+export default function DashboardLayout({ children, title = "Dashboard", skipPaywall = false }: DashboardLayoutProps) {
   const router = useRouter()
-  const pathname = usePathname()
   const [detailerId, setDetailerId] = useState<string | null>(null)
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null)
   const [showPaywall, setShowPaywall] = useState(false)
@@ -51,14 +51,15 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
           const data = await response.json()
           if (data.success && data.user?.detailer_id) {
             const id = data.user.detailer_id
+            const userEmail = data.user.email || ''
             setDetailerId(id)
 
             // Check subscription status
             const subscription = await checkSubscriptionStatus(id)
             setSubscriptionStatus(subscription.status)
 
-            // Show paywall if expired (but not on /upgrade page - that page already shows pricing)
-            if (subscription.status === 'expired' && pathname !== '/upgrade') {
+            // Show paywall if expired, but exclude specific email and pages that skip paywall
+            if (subscription.status === 'expired' && userEmail !== 'garrity2mcosker@gmail.com' && !skipPaywall) {
               setShowPaywall(true)
             }
           }
@@ -73,14 +74,8 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
     checkSubscription()
   }, [router])
 
-  // Determine which page is active based on the pathname (more reliable than title)
+  // Determine which page is active based on the title
   const getActivePage = () => {
-    // Use pathname if available, otherwise fall back to title
-    if (pathname) {
-      return pathname
-    }
-    
-    // Fallback to title-based detection
     switch (title.toLowerCase()) {
       case 'dashboard':
       case 'schedule':
@@ -101,6 +96,7 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
         return '/branding'
       case 'upgrade':
       case 'upgrade your plan':
+      case 'pricing':
         return '/upgrade'
       default:
         return '/dashboard'
@@ -199,7 +195,6 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
             Mobile Detailing
           </h2>
           
-          {/* Navigation menu with Upgrade link */}
           <nav className="space-y-2">
             <SidebarButton icon={Calendar} label="Schedule" href="/dashboard" active={activePage === '/dashboard'} />
             <SidebarButton icon={Users} label="Customers" href="/customers" active={activePage === '/customers'} />
@@ -208,7 +203,7 @@ export default function DashboardLayout({ children, title = "Dashboard" }: Dashb
             <SidebarButton icon={DollarSign} label="Payments" href="/payments" active={activePage === '/payments'} />
             <SidebarButton icon={MessageSquare} label="SMS" href="/sms" active={activePage === '/sms'} />
             <SidebarButton icon={Settings} label="Brand Settings" href="/branding" active={activePage === '/branding'} />
-            <SidebarButton icon={TrendingUp} label="Upgrade" href="/upgrade" active={activePage === '/upgrade'} />
+            <SidebarButton icon={Zap} label="Upgrade" href="/upgrade" active={activePage === '/upgrade'} />
           </nav>
         </div>
         

@@ -4,7 +4,7 @@ import { loadStripe } from '@stripe/stripe-js'
 // Server-side Stripe instance
 let stripe: Stripe | null = null
 
-export function getStripeInstance(): Stripe | null {
+function getStripeInstance(): Stripe | null {
   if (!stripe) {
     const secretKey = process.env.STRIPE_SECRET_KEY
     if (!secretKey || secretKey.includes('your_stripe') || secretKey === 'sk_test_dummy') {
@@ -416,25 +416,21 @@ export const subscriptionService = {
 
   // Create Checkout Session for subscription
   async createCheckoutSession(
-    customerId: string | undefined,
+    customerId: string,
     priceId: string,
     detailerId: string,
     successUrl: string,
-    cancelUrl: string,
-    customerEmail?: string
+    cancelUrl: string
   ): Promise<Stripe.Checkout.Session | null> {
     const stripeInstance = getStripeInstance()
     if (!stripeInstance) {
-      console.error('❌ Stripe not configured - Cannot create checkout session')
-      console.error('Check STRIPE_SECRET_KEY environment variable')
+      console.log('🎭 Demo mode: Cannot create checkout session')
       return null
     }
 
     try {
-      console.log('Creating checkout session with:', { customerId: customerId || 'NEW', priceId, detailerId })
-      
-      // Build session params - use customer ID if available, otherwise let Stripe create customer
-      const sessionParams: Stripe.Checkout.SessionCreateParams = {
+      const session = await stripeInstance.checkout.sessions.create({
+        customer: customerId,
         payment_method_types: ['card'],
         mode: 'subscription',
         line_items: [
@@ -453,95 +449,12 @@ export const subscriptionService = {
             detailer_id: detailerId,
           },
         },
-      }
-
-      // If customer ID exists, use it. Otherwise, let Stripe create customer from email
-      if (customerId) {
-        sessionParams.customer = customerId
-      } else if (customerEmail) {
-        sessionParams.customer_email = customerEmail
-      }
-      // If neither, Stripe will collect email during checkout
-
-      const session = await stripeInstance.checkout.sessions.create(sessionParams)
-
-      console.log('✅ Checkout session created:', session.id)
-      return session
-    } catch (error: any) {
-      console.error('❌ Error creating checkout session:', error)
-      console.error('Error details:', {
-        message: error.message,
-        type: error.type,
-        code: error.code,
-        statusCode: error.statusCode,
-        raw: error.raw,
-        priceId,
-        customerId,
-        hasStripeKey: !!process.env.STRIPE_SECRET_KEY,
-        stripeKeyPrefix: process.env.STRIPE_SECRET_KEY?.substring(0, 7)
       })
-      // Re-throw the error so the API route can see the actual Stripe error
-      throw error
-    }
-  },
 
-  // Create Checkout Session for one-time payment (e.g., Lifetime Deal)
-  async createOneTimeCheckoutSession(
-    customerId: string | undefined,
-    priceId: string,
-    detailerId: string,
-    successUrl: string,
-    cancelUrl: string,
-    customerEmail?: string
-  ): Promise<Stripe.Checkout.Session | null> {
-    const stripeInstance = getStripeInstance()
-    if (!stripeInstance) {
-      console.log('🎭 Demo mode: Cannot create one-time checkout session')
+      return session
+    } catch (error) {
+      console.error('Error creating checkout session:', error)
       return null
-    }
-
-    try {
-      // Build session params - use customer ID if available, otherwise let Stripe create customer
-      const sessionParams: Stripe.Checkout.SessionCreateParams = {
-        payment_method_types: ['card'],
-        mode: 'payment', // One-time payment, not subscription
-        line_items: [
-          {
-            price: priceId,
-            quantity: 1,
-          },
-        ],
-        success_url: successUrl,
-        cancel_url: cancelUrl,
-        metadata: {
-          detailer_id: detailerId,
-          plan_type: 'lifetime',
-        },
-      }
-
-      // If customer ID exists, use it. Otherwise, let Stripe create customer from email
-      if (customerId) {
-        sessionParams.customer = customerId
-      } else if (customerEmail) {
-        sessionParams.customer_email = customerEmail
-      }
-      // If neither, Stripe will collect email during checkout
-
-      const session = await stripeInstance.checkout.sessions.create(sessionParams)
-
-      return session
-    } catch (error: any) {
-      console.error('❌ Error creating one-time checkout session:', error)
-      console.error('Error details:', {
-        message: error.message,
-        type: error.type,
-        code: error.code,
-        statusCode: error.statusCode,
-        priceId,
-        customerId
-      })
-      // Re-throw the error so the API route can see the actual Stripe error
-      throw error
     }
   },
 

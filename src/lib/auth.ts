@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { getSupabaseClient } from './supabase'
 import { detailerService } from './database'
+// @ts-ignore - jsonwebtoken is available as transitive dependency
 import jwt from 'jsonwebtoken'
 
 // Verify authentication using Supabase Auth

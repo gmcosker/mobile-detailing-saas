@@ -40,8 +40,7 @@ const pricingPlans = [
       'Priority support',
       'Analytics dashboard'
     ],
-    popular: false,
-    featured: true
+    popular: true
   },
   {
     id: 'business',
@@ -70,7 +69,7 @@ const pricingPlans = [
       'Lifetime access (no renewals)',
       'One-time payment'
     ],
-    popular: false
+    popular: true
   }
 ]
 
@@ -119,6 +118,12 @@ export default function UpgradePage() {
   }, [router])
 
   const handleSelectPlan = async (planId: string) => {
+    if (!detailerId) {
+      alert('Please log in to upgrade')
+      router.push('/login')
+      return
+    }
+
     setIsProcessing(true)
     setSelectedPlan(planId)
 
@@ -128,11 +133,11 @@ export default function UpgradePage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` }),
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           planId,
-          detailerId: detailerId || null, // null for new customers
+          detailerId,
         }),
       })
 
@@ -151,7 +156,7 @@ export default function UpgradePage() {
     }
   }
 
-  const lifetimePlan = pricingPlans.find((p) => p.id === 'lifetime')
+  const lifetimePlan = pricingPlans.find((p) => p.id === 'lifetime')!
   const mainPlans = pricingPlans.filter((p) => p.id !== 'lifetime')
 
   const pricingContent = (
@@ -174,17 +179,15 @@ export default function UpgradePage() {
         ))}
       </div>
 
-      {lifetimePlan && (
-        <div className="grid md:grid-cols-3 gap-8 mb-10">
-          <div></div>
-          <PlanCard
-            plan={lifetimePlan}
-            onSelect={handleSelectPlan}
-            isProcessing={isProcessing && selectedPlan === lifetimePlan.id}
-          />
-          <div></div>
-        </div>
-      )}
+      <div className="grid md:grid-cols-3 gap-8 mb-10">
+        <div></div>
+        <PlanCard
+          plan={lifetimePlan}
+          onSelect={handleSelectPlan}
+          isProcessing={isProcessing && selectedPlan === lifetimePlan.id}
+        />
+        <div></div>
+      </div>
 
       <div className="text-center text-sm text-muted-foreground">
         <p>All plans include a 14-day free trial. Cancel anytime.</p>
@@ -206,7 +209,7 @@ export default function UpgradePage() {
   // If user is logged in, use DashboardLayout, otherwise use simple public layout
   if (detailerId) {
     return (
-      <DashboardLayout title="Upgrade Your Plan">
+      <DashboardLayout title="Upgrade Your Plan" skipPaywall={true}>
         {pricingContent}
       </DashboardLayout>
     )
@@ -238,23 +241,18 @@ function PlanCard({
   onSelect,
   isProcessing,
 }: {
-  plan: typeof pricingPlans[number] & { featured?: boolean }
+  plan: typeof pricingPlans[number]
   onSelect: (planId: string) => void
   isProcessing: boolean
 }) {
   return (
     <div
-      className={`relative border-2 rounded-lg p-8 transition-all ${
-        plan.featured 
-          ? 'border-blue-500 bg-gradient-to-br from-blue-100 via-cyan-100 to-blue-200 dark:from-blue-900/40 dark:via-cyan-900/40 dark:to-blue-800/40 shadow-xl scale-[1.03] ring-2 ring-blue-400/50' 
-          : plan.popular 
-          ? 'border-primary bg-primary/5 scale-[1.02]' 
-          : 'border-border bg-card'
+      className={`relative border-2 rounded-lg p-8 ${
+        plan.popular ? 'border-primary bg-primary/5 scale-[1.02]' : 'border-border bg-card'
       }`}
     >
 
       <div className="text-center mb-6">
-        {/* NO BADGES - explicitly removed */}
         <h3 className="text-2xl font-bold text-foreground mb-2">{plan.name}</h3>
         <p className="text-sm text-muted-foreground mb-4">{plan.description}</p>
         <div className="flex items-baseline justify-center gap-1">
@@ -274,18 +272,9 @@ function PlanCard({
 
       <Button
         onClick={() => onSelect(plan.id)}
-        className={`w-full font-bold text-lg py-7 ${
-          plan.featured 
-            ? 'bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white border-0 shadow-2xl hover:shadow-2xl transform hover:scale-105 transition-all brightness-110' 
-            : ''
-        }`}
-        variant={plan.featured ? 'default' : plan.popular ? 'default' : 'outline'}
+        className="w-full"
+        variant={plan.popular ? 'default' : 'outline'}
         disabled={isProcessing}
-        style={plan.featured ? { 
-          background: 'linear-gradient(135deg, #2563eb 0%, #06b6d4 100%)',
-          boxShadow: '0 10px 25px rgba(37, 99, 235, 0.4)',
-          fontWeight: '700'
-        } : {}}
       >
         {isProcessing ? (
           <>

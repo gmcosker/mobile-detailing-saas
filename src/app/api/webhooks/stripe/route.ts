@@ -237,39 +237,6 @@ export async function POST(request: NextRequest) {
         break
       }
 
-      case 'checkout.session.completed': {
-        const session = event.data.object as Stripe.Checkout.Session
-        const detailerId = session.metadata?.detailer_id
-        const planType = session.metadata?.plan_type
-
-        // Handle lifetime deal (one-time payment)
-        if (planType === 'lifetime' && session.payment_status === 'paid' && detailerId) {
-          const supabase = getSupabaseClient()
-          if (supabase) {
-            const { data: detailer } = await supabase
-              .from('detailers')
-              .select('id')
-              .eq('detailer_id', detailerId)
-              .single()
-
-            if (detailer) {
-              await supabase
-                .from('detailers')
-                .update({
-                  subscription_status: 'active',
-                  subscription_plan: 'lifetime',
-                  subscription_ends_at: null, // Lifetime = no end date
-                  stripe_customer_id: session.customer as string,
-                })
-                .eq('id', detailer.id)
-
-              console.log('Lifetime deal activated for detailer:', detailerId)
-            }
-          }
-        }
-        break
-      }
-
       default:
         console.log(`Unhandled event type: ${event.type}`)
     }
